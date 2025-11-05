@@ -1,32 +1,58 @@
 // Enemy Dodger - Survive as long as possible
-const config = {
-  type: Phaser.AUTO,
-  width: 800,
-  height: 600,
-  backgroundColor: '#1a1a2e',
-  physics: {
-    default: 'arcade',
-    arcade: {
-      gravity: { y: 0 },
-      debug: false,
-    },
-  },
-  scene: {
-    create: create,
-    update: update,
-  },
-}
-
-const game = new Phaser.Game(config)
-
 let player
 let cursors
 let enemies
 let score = 0
 let scoreText
 let gameOver = false
+let sceneContext
+
+const spawnEnemy = function () {
+  if (gameOver) return
+
+  const x = Phaser.Math.Between(30, 770)
+  const enemyGraphic = sceneContext.add.rectangle(x, -20, 30, 30, 0xff0000)
+  const enemy = sceneContext.physics.add.existing(enemyGraphic)
+
+  // Enemies get faster as score increases
+  const speed = 100 + score / 10
+  enemy.body.setVelocityY(speed)
+
+  enemies.add(enemy)
+}
+
+const hitEnemy = function () {
+  if (gameOver) return
+
+  gameOver = true
+  sceneContext.physics.pause()
+
+  const gameOverText = sceneContext.add.text(400, 300, 'GAME OVER', {
+    fontSize: '64px',
+    fill: '#ff0000',
+  })
+  gameOverText.setOrigin(0.5)
+
+  const finalScoreText = sceneContext.add.text(
+    400,
+    370,
+    'Final Score: ' + score,
+    {
+      fontSize: '32px',
+      fill: '#fff',
+    }
+  )
+  finalScoreText.setOrigin(0.5)
+
+  const restartText = sceneContext.add.text(400, 430, 'Refresh to play again', {
+    fontSize: '24px',
+    fill: '#aaa',
+  })
+  restartText.setOrigin(0.5)
+}
 
 function create() {
+  sceneContext = this
   // Create player (green circle at bottom)
   const playerGraphic = this.add.circle(400, 550, 20, 0x00ff00)
   player = this.physics.add.existing(playerGraphic)
@@ -39,7 +65,6 @@ function create() {
   this.time.addEvent({
     delay: 1000,
     callback: spawnEnemy,
-    callbackScope: this,
     loop: true,
   })
 
@@ -52,12 +77,11 @@ function create() {
         scoreText.setText('Score: ' + score)
       }
     },
-    callbackScope: this,
     loop: true,
   })
 
   // Collision detection
-  this.physics.add.overlap(player, enemies, hitEnemy, null, this)
+  this.physics.add.overlap(player, enemies, hitEnemy)
 
   // Input
   cursors = this.input.keyboard.createCursorKeys()
@@ -96,41 +120,22 @@ function update() {
   })
 }
 
-function spawnEnemy() {
-  if (gameOver) return
-
-  const x = Phaser.Math.Between(30, 770)
-  const enemyGraphic = this.add.rectangle(x, -20, 30, 30, 0xff0000)
-  const enemy = this.physics.add.existing(enemyGraphic)
-
-  // Enemies get faster as score increases
-  const speed = 100 + score / 10
-  enemy.body.setVelocityY(speed)
-
-  enemies.add(enemy)
+const config = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  backgroundColor: '#1a1a2e',
+  physics: {
+    default: 'arcade',
+    arcade: {
+      gravity: { y: 0 },
+      debug: false,
+    },
+  },
+  scene: {
+    create: create,
+    update: update,
+  },
 }
 
-function hitEnemy() {
-  if (gameOver) return
-
-  gameOver = true
-  this.physics.pause()
-
-  const gameOverText = this.add.text(400, 300, 'GAME OVER', {
-    fontSize: '64px',
-    fill: '#ff0000',
-  })
-  gameOverText.setOrigin(0.5)
-
-  const finalScoreText = this.add.text(400, 370, 'Final Score: ' + score, {
-    fontSize: '32px',
-    fill: '#fff',
-  })
-  finalScoreText.setOrigin(0.5)
-
-  const restartText = this.add.text(400, 430, 'Refresh to play again', {
-    fontSize: '24px',
-    fill: '#aaa',
-  })
-  restartText.setOrigin(0.5)
-}
+const game = new Phaser.Game(config)

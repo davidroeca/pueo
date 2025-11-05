@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useChatStore, ChatMessage } from '../store/useChatStore'
 import { Streamdown } from 'streamdown'
-import { downloadGame } from '../utils/gameExport'
+import { downloadGame, extractCodeFromMarkdown } from '../utils/gameExport'
+import { GamePreview } from './GamePreview'
 
 interface GameTemplate {
   name: string
@@ -18,6 +19,7 @@ export function GameBuilderTest() {
     useState<GameTemplate | null>(null)
   const [isGameBuilderMode, setIsGameBuilderMode] = useState(false)
   const [systemPrompt, setSystemPrompt] = useState<string>('')
+  const [previewCode, setPreviewCode] = useState<string | null>(null)
 
   const {
     messages,
@@ -97,6 +99,34 @@ export function GameBuilderTest() {
 
     const filename = `${selectedTemplate.name.toLowerCase().replace(/\s+/g, '-')}.html`
     downloadGame(selectedTemplate.code, filename)
+  }
+
+  const previewGame = (code: string) => {
+    setPreviewCode(code)
+  }
+
+  const closePreview = () => {
+    setPreviewCode(null)
+  }
+
+  const previewLatestGame = () => {
+    // Find the last assistant message with code
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') {
+        const code = extractCodeFromMarkdown(messages[i].content)
+        if (code) {
+          previewGame(code)
+          return
+        }
+      }
+    }
+    // Also check streaming response
+    if (streamingResponse) {
+      const code = extractCodeFromMarkdown(streamingResponse)
+      if (code) {
+        previewGame(code)
+      }
+    }
   }
 
   return (
@@ -191,6 +221,13 @@ export function GameBuilderTest() {
             </button>
             <button
               type="button"
+              onClick={previewLatestGame}
+              className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-white bg-green-600 hover:bg-green-700 transition-colors shadow-sm cursor-pointer"
+            >
+              Preview
+            </button>
+            <button
+              type="button"
               onClick={clearChat}
               className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm hover:border-blue-600 active:bg-gray-200 dark:active:bg-gray-900/40 cursor-pointer"
             >
@@ -212,12 +249,26 @@ export function GameBuilderTest() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                   {description}
                 </p>
-                <button
-                  onClick={() => loadTemplate(key)}
-                  className="text-sm rounded border border-transparent px-3 py-1.5 text-gray-900 bg-gray-100 dark:text-white dark:bg-gray-800 hover:border-blue-600 cursor-pointer"
-                >
-                  View Code
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      const template = await invoke<GameTemplate>(
+                        'get_game_template',
+                        { key }
+                      )
+                      previewGame(template.code)
+                    }}
+                    className="text-sm rounded border border-transparent px-3 py-1.5 text-white bg-green-600 hover:bg-green-700 cursor-pointer"
+                  >
+                    Preview
+                  </button>
+                  <button
+                    onClick={() => loadTemplate(key)}
+                    className="text-sm rounded border border-transparent px-3 py-1.5 text-gray-900 bg-gray-100 dark:text-white dark:bg-gray-800 hover:border-blue-600 cursor-pointer"
+                  >
+                    View Code
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -226,12 +277,20 @@ export function GameBuilderTest() {
             <div className="mt-5 border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-900">
               <div className="flex justify-between items-center mb-2">
                 <h4 className="font-semibold">{selectedTemplate.name}</h4>
-                <button
-                  onClick={saveTemplate}
-                  className="text-sm rounded border border-transparent px-3 py-1.5 text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"
-                >
-                  Download
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => previewGame(selectedTemplate.code)}
+                    className="text-sm rounded border border-transparent px-3 py-1.5 text-white bg-green-600 hover:bg-green-700 cursor-pointer"
+                  >
+                    Preview
+                  </button>
+                  <button
+                    onClick={saveTemplate}
+                    className="text-sm rounded border border-transparent px-3 py-1.5 text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"
+                  >
+                    Download
+                  </button>
+                </div>
               </div>
               <pre className="text-xs overflow-auto max-h-[300px] bg-gray-100 dark:bg-gray-800 p-2 rounded">
                 <code>{selectedTemplate.code}</code>
@@ -240,6 +299,10 @@ export function GameBuilderTest() {
           )}
         </div>
       </div>
+
+      {previewCode && (
+        <GamePreview code={previewCode} onClose={closePreview} />
+      )}
     </div>
   )
 }

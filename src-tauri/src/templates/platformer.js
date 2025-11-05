@@ -1,32 +1,30 @@
 // Simple Platformer - Jump and collect stars
-const config = {
-  type: Phaser.AUTO,
-  width: 800,
-  height: 600,
-  backgroundColor: '#87CEEB',
-  physics: {
-    default: 'arcade',
-    arcade: {
-      gravity: { y: 300 },
-      debug: false,
-    },
-  },
-  scene: {
-    create: create,
-    update: update,
-  },
-}
-
-const game = new Phaser.Game(config)
-
 let player
 let platforms
 let cursors
 let stars
 let score = 0
 let scoreText
+let sceneContext
+
+const collectStar = function (player, star) {
+  star.destroy()
+  score += 10
+  scoreText.setText('Score: ' + score)
+
+  if (stars.countActive(true) === 0) {
+    // All stars collected - you win!
+    const winText = sceneContext.add.text(400, 300, 'YOU WIN!', {
+      fontSize: '64px',
+      fill: '#00ff00',
+    })
+    winText.setOrigin(0.5)
+    sceneContext.physics.pause()
+  }
+}
 
 function create() {
+  sceneContext = this
   // Create platforms
   platforms = this.physics.add.staticGroup()
 
@@ -66,7 +64,7 @@ function create() {
   // Physics interactions
   this.physics.add.collider(player, platforms)
   this.physics.add.collider(stars, platforms)
-  this.physics.add.overlap(player, stars, collectStar, null, this)
+  this.physics.add.overlap(player, stars, collectStar)
 
   // Input
   cursors = this.input.keyboard.createCursorKeys()
@@ -92,18 +90,22 @@ function update() {
   }
 }
 
-function collectStar(player, star) {
-  star.destroy()
-  score += 10
-  scoreText.setText('Score: ' + score)
-
-  if (stars.countActive(true) === 0) {
-    // All stars collected - you win!
-    const winText = this.add.text(400, 300, 'YOU WIN!', {
-      fontSize: '64px',
-      fill: '#00ff00',
-    })
-    winText.setOrigin(0.5)
-    this.physics.pause()
-  }
+const config = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  backgroundColor: '#87CEEB',
+  physics: {
+    default: 'arcade',
+    arcade: {
+      gravity: { y: 300 },
+      debug: false,
+    },
+  },
+  scene: {
+    create: create,
+    update: update,
+  },
 }
+
+const game = new Phaser.Game(config)

@@ -1,25 +1,75 @@
 // Click Collector - Click targets before they disappear
-const config = {
-  type: Phaser.AUTO,
-  width: 800,
-  height: 600,
-  backgroundColor: '#2d2d2d',
-  scene: {
-    create: create,
-    update: update,
-  },
-}
-
-const game = new Phaser.Game(config)
-
 let targets
 let score = 0
 let scoreText
 let timeLeft = 30
 let timerText
 let gameOver = false
+let sceneContext
+
+const spawnTarget = function () {
+  if (gameOver) return
+
+  const x = Phaser.Math.Between(100, 700)
+  const y = Phaser.Math.Between(150, 550)
+  const color = Phaser.Math.RND.pick([0xff6b6b, 0x4ecdc4, 0xffe66d, 0xa8e6cf])
+
+  const target = sceneContext.add.circle(x, y, 40, color)
+  target.setInteractive()
+
+  target.on('pointerdown', () => {
+    if (!gameOver && target.active) {
+      // More points for clicking faster (higher alpha = newer target)
+      const points = Math.floor(target.alpha * 10)
+      score += points
+      scoreText.setText('Score: ' + score)
+
+      // Visual feedback
+      const pointsText = sceneContext.add.text(target.x, target.y, '+' + points, {
+        fontSize: '24px',
+        fill: '#fff',
+      })
+      pointsText.setOrigin(0.5)
+
+      sceneContext.tweens.add({
+        targets: pointsText,
+        y: target.y - 50,
+        alpha: 0,
+        duration: 500,
+        onComplete: () => pointsText.destroy(),
+      })
+
+      target.destroy()
+    }
+  })
+
+  targets.add(target)
+}
+
+const endGame = function () {
+  gameOver = true
+
+  const gameOverText = sceneContext.add.text(400, 250, "TIME'S UP!", {
+    fontSize: '64px',
+    fill: '#fff',
+  })
+  gameOverText.setOrigin(0.5)
+
+  const finalScoreText = sceneContext.add.text(400, 340, 'Final Score: ' + score, {
+    fontSize: '40px',
+    fill: '#ffe66d',
+  })
+  finalScoreText.setOrigin(0.5)
+
+  const restartText = sceneContext.add.text(400, 420, 'Refresh to play again', {
+    fontSize: '24px',
+    fill: '#aaa',
+  })
+  restartText.setOrigin(0.5)
+}
 
 function create() {
+  sceneContext = this
   // UI
   scoreText = this.add.text(16, 16, 'Score: 0', {
     fontSize: '32px',
@@ -45,7 +95,6 @@ function create() {
   this.time.addEvent({
     delay: 800,
     callback: spawnTarget,
-    callbackScope: this,
     loop: true,
   })
 
@@ -58,11 +107,10 @@ function create() {
         timerText.setText('Time: ' + timeLeft)
 
         if (timeLeft <= 0) {
-          endGame.call(this)
+          endGame()
         }
       }
     },
-    callbackScope: this,
     loop: true,
   })
 }
@@ -81,63 +129,15 @@ function update() {
   })
 }
 
-function spawnTarget() {
-  if (gameOver) return
-
-  const x = Phaser.Math.Between(100, 700)
-  const y = Phaser.Math.Between(150, 550)
-  const color = Phaser.Math.RND.pick([0xff6b6b, 0x4ecdc4, 0xffe66d, 0xa8e6cf])
-
-  const target = this.add.circle(x, y, 40, color)
-  target.setInteractive()
-
-  target.on('pointerdown', () => {
-    if (!gameOver && target.active) {
-      // More points for clicking faster (higher alpha = newer target)
-      const points = Math.floor(target.alpha * 10)
-      score += points
-      scoreText.setText('Score: ' + score)
-
-      // Visual feedback
-      const pointsText = this.add.text(target.x, target.y, '+' + points, {
-        fontSize: '24px',
-        fill: '#fff',
-      })
-      pointsText.setOrigin(0.5)
-
-      this.tweens.add({
-        targets: pointsText,
-        y: target.y - 50,
-        alpha: 0,
-        duration: 500,
-        onComplete: () => pointsText.destroy(),
-      })
-
-      target.destroy()
-    }
-  })
-
-  targets.add(target)
+const config = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  backgroundColor: '#2d2d2d',
+  scene: {
+    create: create,
+    update: update,
+  },
 }
 
-function endGame() {
-  gameOver = true
-
-  const gameOverText = this.add.text(400, 250, "TIME'S UP!", {
-    fontSize: '64px',
-    fill: '#fff',
-  })
-  gameOverText.setOrigin(0.5)
-
-  const finalScoreText = this.add.text(400, 340, 'Final Score: ' + score, {
-    fontSize: '40px',
-    fill: '#ffe66d',
-  })
-  finalScoreText.setOrigin(0.5)
-
-  const restartText = this.add.text(400, 420, 'Refresh to play again', {
-    fontSize: '24px',
-    fill: '#aaa',
-  })
-  restartText.setOrigin(0.5)
-}
+const game = new Phaser.Game(config)
