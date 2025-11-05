@@ -1,36 +1,36 @@
-import { useState, useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { useEffect } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { Streamdown } from 'streamdown'
-
-interface ChatMessage {
-  role: string
-  content: string
-}
+import { useChatStore } from './store/useChatStore'
 
 function App() {
-  const [apiKey, setApiKey] = useState('')
-  const [isInitialized, setIsInitialized] = useState(false)
-  const [initError, setInitError] = useState('')
-
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [input, setInput] = useState('')
-  const [streamingResponse, setStreamingResponse] = useState('')
-  const [isStreaming, setIsStreaming] = useState(false)
-  const [error, setError] = useState('')
+  const {
+    apiKey,
+    setApiKey,
+    isInitialized,
+    initError,
+    messages,
+    input,
+    setInput,
+    streamingResponse,
+    isStreaming,
+    error,
+    initializeAI,
+    sendStreamingMessage,
+    sendNonStreamingMessage,
+    clearChat,
+    checkInitialization,
+    appendStreamingResponse,
+    setStreamingResponse,
+    setIsStreaming,
+    addMessage,
+    setError,
+  } = useChatStore()
 
   // Check if AI is already initialized (from .env)
   useEffect(() => {
-    const checkInitialization = async () => {
-      try {
-        const initialized = await invoke<boolean>('is_ai_initialized')
-        setIsInitialized(initialized)
-      } catch (err) {
-        console.error('Failed to check initialization:', err)
-      }
-    }
     checkInitialization()
-  }, [])
+  }, [checkInitialization])
 
   // Set up event listeners for streaming
   useEffect(() => {
@@ -39,24 +39,26 @@ function App() {
     const setupListeners = async () => {
       // Listen for streaming tokens
       const unlistenToken = await listen<string>('chat-token', (event) => {
-        setStreamingResponse((prev) => prev + event.payload)
+        appendStreamingResponse(event.payload)
+        console.log('chat-token', event.payload)
       })
 
       const unlistenFinalResponse = await listen<string>(
         'chat-final-response',
         (event) => {
-          setStreamingResponse(event.payload)
+          // When we receive the final response, add it to messages immediately
+          const finalContent = event.payload
+          console.log('final-content', event.payload)
+          addMessage({ role: 'assistant', content: finalContent })
+          setStreamingResponse('')
+          setIsStreaming(false)
         },
       )
 
-      // Listen for stream completion
+      // Listen for stream completion (just cleanup, message already added by final-response)
       const unlistenComplete = await listen('chat-complete', () => {
+        // Just ensure streaming state is cleaned up
         setIsStreaming(false)
-        // Add the completed response to messages
-        setMessages((prev) => [
-          ...prev,
-          { role: 'assistant', content: streamingResponse },
-        ])
         setStreamingResponse('')
       })
 
@@ -80,77 +82,13 @@ function App() {
     return () => {
       unlisten.forEach((fn) => fn())
     }
-  }, [streamingResponse])
-
-  // Initialize the AI client
-  async function initializeAI() {
-    try {
-      setInitError('')
-      const result = await invoke<string>('init_ai', { apiKey })
-      setIsInitialized(true)
-      console.log(result)
-    } catch (err) {
-      setInitError(String(err))
-    }
-  }
-
-  // Send a streaming chat message
-  async function sendStreamingMessage() {
-    if (!input.trim()) return
-
-    setError('')
-    const userMessage: ChatMessage = { role: 'user', content: input }
-    const updatedMessages = [...messages, userMessage]
-    setMessages(updatedMessages)
-    setInput('')
-    setIsStreaming(true)
-    setStreamingResponse('')
-
-    try {
-      await invoke('stream_chat', {
-        messages: updatedMessages,
-        model: 'claude-sonnet-4-5-20250929',
-      })
-    } catch (err) {
-      setError(String(err))
-      setIsStreaming(false)
-    }
-  }
-
-  // Send a non-streaming chat message (waits for full response)
-  async function sendNonStreamingMessage() {
-    if (!input.trim()) return
-
-    setError('')
-    const userMessage: ChatMessage = { role: 'user', content: input }
-    const updatedMessages = [...messages, userMessage]
-    setMessages(updatedMessages)
-    setInput('')
-    setIsStreaming(true)
-
-    try {
-      const response = await invoke<string>('chat_completion', {
-        messages: updatedMessages,
-        model: 'claude-sonnet-4-5-20250929',
-      })
-
-      setMessages([
-        ...updatedMessages,
-        { role: 'assistant', content: response },
-      ])
-      setIsStreaming(false)
-    } catch (err) {
-      setError(String(err))
-      setIsStreaming(false)
-    }
-  }
-
-  // Clear chat history
-  function clearChat() {
-    setMessages([])
-    setStreamingResponse('')
-    setError('')
-  }
+  }, [
+    appendStreamingResponse,
+    addMessage,
+    setStreamingResponse,
+    setIsStreaming,
+    setError,
+  ])
 
   return (
     <main className="m-0 pt-[10vh] flex flex-col justify-center text-center">
