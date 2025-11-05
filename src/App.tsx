@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { Streamdown } from 'streamdown'
 import { useChatStore } from './store/useChatStore'
@@ -32,8 +32,14 @@ function App() {
     checkInitialization()
   }, [checkInitialization])
 
+  // https://stackoverflow.com/a/72238236 - fixes double initialization in strict mode
+  const listenersInitialized = useRef(false)
+
   // Set up event listeners for streaming
   useEffect(() => {
+    if (listenersInitialized.current) {
+      return
+    }
     let unlisten: UnlistenFn[] = []
 
     const setupListeners = async () => {
@@ -78,6 +84,8 @@ function App() {
     }
 
     setupListeners()
+
+    listenersInitialized.current = true
 
     return () => {
       unlisten.forEach((fn) => fn())
