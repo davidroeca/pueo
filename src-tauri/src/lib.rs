@@ -9,6 +9,8 @@ use std::sync::Arc;
 use tauri::{Emitter, State, Window};
 use tokio::sync::Mutex;
 
+mod game_builder;
+
 // Shared state for the LLM client
 pub struct AppState {
     client: Arc<Mutex<Option<anthropic::Client>>>,
@@ -207,6 +209,27 @@ async fn chat_completion(
     Ok(response)
 }
 
+// Game Builder commands
+#[tauri::command]
+fn get_game_builder_prompt() -> String {
+    game_builder::get_system_prompt()
+}
+
+#[tauri::command]
+fn get_game_template(key: String) -> Result<game_builder::GameTemplate, String> {
+    game_builder::get_template(&key).ok_or_else(|| format!("Template '{}' not found", key))
+}
+
+#[tauri::command]
+fn get_game_template_list() -> Vec<(String, String, String)> {
+    game_builder::get_template_list()
+}
+
+#[tauri::command]
+fn get_common_patterns() -> game_builder::CommonPatterns {
+    game_builder::get_common_patterns()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Try to load .env file (ignore if it doesn't exist)
@@ -232,7 +255,11 @@ pub fn run() {
             is_ai_initialized,
             init_ai,
             stream_chat,
-            chat_completion
+            chat_completion,
+            get_game_builder_prompt,
+            get_game_template,
+            get_game_template_list,
+            get_common_patterns
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
