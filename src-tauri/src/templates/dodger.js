@@ -12,13 +12,14 @@ const spawnEnemy = function () {
 
   const x = Phaser.Math.Between(30, 770)
   const enemyGraphic = sceneContext.add.rectangle(x, -20, 30, 30, 0xff0000)
-  const enemy = sceneContext.physics.add.existing(enemyGraphic)
+
+  // Add to group first, then set velocity
+  enemies.add(enemyGraphic)
+  sceneContext.physics.add.existing(enemyGraphic)
 
   // Enemies get faster as score increases
   const speed = 100 + score / 10
-  enemy.body.setVelocityY(speed)
-
-  enemies.add(enemy)
+  enemyGraphic.body.setVelocityY(speed)
 }
 
 const hitEnemy = function () {
@@ -40,7 +41,7 @@ const hitEnemy = function () {
     {
       fontSize: '32px',
       fill: '#fff',
-    }
+    },
   )
   finalScoreText.setOrigin(0.5)
 
@@ -64,7 +65,7 @@ function create() {
   // Spawn enemies periodically
   this.time.addEvent({
     delay: 1000,
-    callback: spawnEnemy,
+    callback: () => spawnEnemy(),
     loop: true,
   })
 

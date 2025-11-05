@@ -25,10 +25,15 @@ const spawnTarget = function () {
       scoreText.setText('Score: ' + score)
 
       // Visual feedback
-      const pointsText = sceneContext.add.text(target.x, target.y, '+' + points, {
-        fontSize: '24px',
-        fill: '#fff',
-      })
+      const pointsText = sceneContext.add.text(
+        target.x,
+        target.y,
+        '+' + points,
+        {
+          fontSize: '24px',
+          fill: '#fff',
+        },
+      )
       pointsText.setOrigin(0.5)
 
       sceneContext.tweens.add({
@@ -55,10 +60,15 @@ const endGame = function () {
   })
   gameOverText.setOrigin(0.5)
 
-  const finalScoreText = sceneContext.add.text(400, 340, 'Final Score: ' + score, {
-    fontSize: '40px',
-    fill: '#ffe66d',
-  })
+  const finalScoreText = sceneContext.add.text(
+    400,
+    340,
+    'Final Score: ' + score,
+    {
+      fontSize: '40px',
+      fill: '#ffe66d',
+    },
+  )
   finalScoreText.setOrigin(0.5)
 
   const restartText = sceneContext.add.text(400, 420, 'Refresh to play again', {
@@ -94,7 +104,7 @@ function create() {
   // Spawn targets periodically
   this.time.addEvent({
     delay: 800,
-    callback: spawnTarget,
+    callback: () => spawnTarget(),
     loop: true,
   })
 
