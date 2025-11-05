@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
+import { Streamdown } from 'streamdown'
 
 interface ChatMessage {
   role: string
@@ -38,9 +39,15 @@ function App() {
     const setupListeners = async () => {
       // Listen for streaming tokens
       const unlistenToken = await listen<string>('chat-token', (event) => {
-        console.log(event.payload)
         setStreamingResponse((prev) => prev + event.payload)
       })
+
+      const unlistenFinalResponse = await listen<string>(
+        'chat-final-response',
+        (event) => {
+          setStreamingResponse(event.payload)
+        },
+      )
 
       // Listen for stream completion
       const unlistenComplete = await listen('chat-complete', () => {
@@ -60,7 +67,12 @@ function App() {
         setStreamingResponse('')
       })
 
-      unlisten = [unlistenToken, unlistenComplete, unlistenError]
+      unlisten = [
+        unlistenToken,
+        unlistenFinalResponse,
+        unlistenComplete,
+        unlistenError,
+      ]
     }
 
     setupListeners()
@@ -122,7 +134,10 @@ function App() {
         model: 'claude-sonnet-4-5-20250929',
       })
 
-      setMessages([...updatedMessages, { role: 'assistant', content: response }])
+      setMessages([
+        ...updatedMessages,
+        { role: 'assistant', content: response },
+      ])
       setIsStreaming(false)
     } catch (err) {
       setError(String(err))
@@ -145,7 +160,15 @@ function App() {
         <div className="max-w-[500px] mx-auto p-10">
           <h2>Initialize AI Client</h2>
           <p className="text-gray-600 text-sm mb-5 dark:text-gray-400">
-            Enter your API key, or add <code className="bg-gray-200 px-1 rounded dark:bg-gray-700">ANTHROPIC_API_KEY</code> to <code className="bg-gray-200 px-1 rounded dark:bg-gray-700">.env</code> file
+            Enter your API key, or add{' '}
+            <code className="bg-gray-200 px-1 rounded dark:bg-gray-700">
+              ANTHROPIC_API_KEY
+            </code>{' '}
+            to{' '}
+            <code className="bg-gray-200 px-1 rounded dark:bg-gray-700">
+              .env
+            </code>{' '}
+            file
           </p>
           <form
             className="flex flex-col gap-3"
@@ -168,7 +191,9 @@ function App() {
               Initialize
             </button>
           </form>
-          {initError && <p className="text-red-600 mt-3 dark:text-red-400">{initError}</p>}
+          {initError && (
+            <p className="text-red-600 mt-3 dark:text-red-400">{initError}</p>
+          )}
         </div>
       ) : (
         <div className="max-w-[800px] mx-auto px-5">
@@ -191,20 +216,28 @@ function App() {
                     : 'bg-gray-100 dark:bg-gray-800 mr-[20%]'
                 }`}
               >
-                <strong>{msg.role === 'user' ? 'You' : 'Claude'}:</strong>{' '}
-                {msg.content}
+                <div className="font-bold mb-1">
+                  {msg.role === 'user' ? 'You' : 'Claude'}
+                </div>
+                <Streamdown>{msg.content}</Streamdown>
               </div>
             ))}
 
             {streamingResponse && (
               <div className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[20%]">
-                <strong>Claude:</strong> {streamingResponse}
-                <span className="animate-pulse">▊</span>
+                <div className="font-bold mb-1">Claude</div>
+                <Streamdown isAnimating={isStreaming}>
+                  {streamingResponse}
+                </Streamdown>
               </div>
             )}
           </div>
 
-          {error && <p className="text-red-600 mb-3 dark:text-red-400">Error: {error}</p>}
+          {error && (
+            <p className="text-red-600 mb-3 dark:text-red-400">
+              Error: {error}
+            </p>
+          )}
 
           <form
             className="flex gap-2.5 items-center"

@@ -110,14 +110,21 @@ async fn stream_chat(
     // Stream tokens to frontend
     while let Some(result) = stream.next().await {
         match result {
-            Ok(chunk) => {
-                if let MultiTurnStreamItem::StreamItem(StreamedAssistantContent::Text(text)) = chunk
-                {
+            Ok(chunk) => match chunk {
+                MultiTurnStreamItem::StreamItem(item) => {
+                    if let StreamedAssistantContent::Text(text) = item {
+                        window
+                            .emit("chat-token", &text.text)
+                            .map_err(|e| format!("Failed to emit token: {}", e))?;
+                    }
+                }
+                MultiTurnStreamItem::FinalResponse(response) => {
                     window
-                        .emit("chat-token", &text.text)
+                        .emit("chat-final-response", &response.response())
                         .map_err(|e| format!("Failed to emit token: {}", e))?;
                 }
-            }
+                _ => (),
+            },
             Err(e) => {
                 window
                     .emit("chat-error", format!("Stream error: {}", e))
