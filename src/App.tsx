@@ -17,7 +17,6 @@ function App() {
     error,
     initializeAI,
     sendStreamingMessage,
-    sendNonStreamingMessage,
     clearChat,
     checkInitialization,
     appendStreamingResponse,
@@ -152,7 +151,7 @@ function App() {
             </button>
           </div>
 
-          <div className="min-h-[400px] max-h-[600px] overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-5 mb-5 bg-white dark:bg-gray-900 text-left">
+          <div className="max-w-screen w-[500px] min-h-[400px] max-h-[800px] overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-5 mb-5 bg-white dark:bg-gray-900 text-left">
             {messages.map((msg, idx) => (
               <div
                 key={idx}
@@ -206,14 +205,6 @@ function App() {
               className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm hover:border-blue-600 active:bg-gray-200 dark:active:bg-gray-900/40 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Stream
-            </button>
-            <button
-              type="button"
-              onClick={sendNonStreamingMessage}
-              disabled={isStreaming}
-              className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm hover:border-blue-600 active:bg-gray-200 dark:active:bg-gray-900/40 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Send (No Stream)
             </button>
           </form>
         </div>
