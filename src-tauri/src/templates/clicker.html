@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Click Collector</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background: #0a0a0a;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      // Click Collector - Click targets before they disappear
+      let targets
+      let score = 0
+      let scoreText
+      let timeLeft = 30
+      let timerText
+      let gameOver = false
+      let sceneContext
+
+      const spawnTarget = function () {
+        if (gameOver) return
+
+        const x = Phaser.Math.Between(100, 700)
+        const y = Phaser.Math.Between(150, 550)
+        const color = Phaser.Math.RND.pick([
+          0xff6b6b, 0x4ecdc4, 0xffe66d, 0xa8e6cf,
+        ])
+
+        const target = sceneContext.add.circle(x, y, 40, color)
+        target.setInteractive()
+
+        target.on('pointerdown', () => {
+          if (!gameOver && target.active) {
+            // More points for clicking faster (higher alpha = newer target)
+            const points = Math.floor(target.alpha * 10)
+            score += points
+            scoreText.setText('Score: ' + score)
+
+            // Visual feedback
+            const pointsText = sceneContext.add.text(
+              target.x,
+              target.y,
+              '+' + points,
+              {
+                fontSize: '24px',
+                fill: '#fff',
+              },
+            )
+            pointsText.setOrigin(0.5)
+
+            sceneContext.tweens.add({
+              targets: pointsText,
+              y: target.y - 50,
+              alpha: 0,
+              duration: 500,
+              onComplete: () => pointsText.destroy(),
+            })
+
+            target.destroy()
+          }
+        })
+
+        targets.add(target)
+      }
+
+      const endGame = function () {
+        gameOver = true
+
+        const gameOverText = sceneContext.add.text(400, 250, "TIME'S UP!", {
+          fontSize: '64px',
+          fill: '#fff',
+        })
+        gameOverText.setOrigin(0.5)
+
+        const finalScoreText = sceneContext.add.text(
+          400,
+          340,
+          'Final Score: ' + score,
+          {
+            fontSize: '40px',
+            fill: '#ffe66d',
+          },
+        )
+        finalScoreText.setOrigin(0.5)
+
+        const restartText = sceneContext.add.text(
+          400,
+          420,
+          'Refresh to play again',
+          {
+            fontSize: '24px',
+            fill: '#aaa',
+          },
+        )
+        restartText.setOrigin(0.5)
+      }
+
+      function create() {
+        sceneContext = this
+        // UI
+        scoreText = this.add.text(16, 16, 'Score: 0', {
+          fontSize: '32px',
+          fill: '#fff',
+        })
+
+        timerText = this.add.text(700, 16, 'Time: 30', {
+          fontSize: '32px',
+          fill: '#fff',
+        })
+
+        this.add
+          .text(400, 50, 'Click the circles!', {
+            fontSize: '28px',
+            fill: '#aaa',
+          })
+          .setOrigin(0.5)
+
+        // Targets group
+        targets = this.add.group()
+
+        // Spawn targets periodically
+        this.time.addEvent({
+          delay: 800,
+          callback: () => spawnTarget(),
+          loop: true,
+        })
+
+        // Countdown timer
+        this.time.addEvent({
+          delay: 1000,
+          callback: () => {
+            if (!gameOver) {
+              timeLeft--
+              timerText.setText('Time: ' + timeLeft)
+
+              if (timeLeft <= 0) {
+                endGame()
+              }
+            }
+          },
+          loop: true,
+        })
+      }
+
+      function update() {
+        // Targets fade and shrink over time
+        targets.children.entries.forEach((target) => {
+          if (target.active) {
+            target.alpha -= 0.01
+            target.scale -= 0.005
+
+            if (target.alpha <= 0 || target.scale <= 0) {
+              target.destroy()
+            }
+          }
+        })
+      }
+
+      const config = {
+        type: Phaser.AUTO,
+        width: 800,
+        height: 600,
+        backgroundColor: '#2d2d2d',
+        scene: {
+          create: create,
+          update: update,
+        },
+      }
+
+      const game = new Phaser.Game(config)
+    </script>
+  </body>
+</html>

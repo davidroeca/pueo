@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
-import { Streamdown } from 'streamdown'
+import Markdown from 'markdown-to-jsx'
 import { useChatStore } from './store/useChatStore'
 import { GameBuilderTest } from './components/GameBuilderTest'
 
@@ -47,7 +47,6 @@ function App() {
       // Listen for streaming tokens
       const unlistenToken = await listen<string>('chat-token', (event) => {
         appendStreamingResponse(event.payload)
-        console.log('chat-token', event.payload)
       })
 
       const unlistenFinalResponse = await listen<string>(
@@ -55,7 +54,6 @@ function App() {
         (event) => {
           // When we receive the final response, add it to messages immediately
           const finalContent = event.payload
-          console.log('final-content', event.payload)
           addMessage({ role: 'assistant', content: finalContent })
           setStreamingResponse('')
           setIsStreaming(false)
@@ -192,16 +190,19 @@ function App() {
                     <div className="font-bold mb-1">
                       {msg.role === 'user' ? 'You' : 'Claude'}
                     </div>
-                    <Streamdown>{msg.content}</Streamdown>
+                    <Markdown>{msg.content}</Markdown>
                   </div>
                 ))}
 
                 {streamingResponse && (
-                  <div className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[20%]">
+                  <div
+                    key={messages.length + 1}
+                    className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[20%]"
+                  >
                     <div className="font-bold mb-1">Claude</div>
-                    <Streamdown isAnimating={isStreaming}>
+                    <Markdown>
                       {streamingResponse}
-                    </Streamdown>
+                    </Markdown>
                   </div>
                 )}
               </div>

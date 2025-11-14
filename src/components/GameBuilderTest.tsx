@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useChatStore, ChatMessage } from '../store/useChatStore'
-import { Streamdown } from 'streamdown'
+import Markdown from 'markdown-to-jsx'
 import { downloadGame, extractCodeFromMarkdown } from '../utils/gameExport'
 import { GamePreview } from './GamePreview'
 
@@ -12,11 +12,12 @@ interface GameTemplate {
 }
 
 export function GameBuilderTest() {
-  const [templates, setTemplates] = useState<
-    [string, string, string][] | null
-  >(null)
-  const [selectedTemplate, setSelectedTemplate] =
-    useState<GameTemplate | null>(null)
+  const [templates, setTemplates] = useState<[string, string, string][] | null>(
+    null,
+  )
+  const [selectedTemplate, setSelectedTemplate] = useState<GameTemplate | null>(
+    null,
+  )
   const [isGameBuilderMode, setIsGameBuilderMode] = useState(false)
   const [systemPrompt, setSystemPrompt] = useState<string>('')
   const [previewCode, setPreviewCode] = useState<string | null>(null)
@@ -84,10 +85,7 @@ export function GameBuilderTest() {
 
     // Temporarily inject system message
     const currentMessages = [...messages]
-    if (
-      currentMessages.length === 0 ||
-      currentMessages[0].role !== 'system'
-    ) {
+    if (currentMessages.length === 0 || currentMessages[0].role !== 'system') {
       setMessages([systemMessage, ...currentMessages])
     }
 
@@ -141,7 +139,9 @@ export function GameBuilderTest() {
               : 'bg-green-600 text-white hover:bg-green-700'
           }`}
         >
-          {isGameBuilderMode ? 'Exit Game Builder Mode' : 'Enter Game Builder Mode'}
+          {isGameBuilderMode
+            ? 'Exit Game Builder Mode'
+            : 'Enter Game Builder Mode'}
         </button>
       </div>
 
@@ -173,16 +173,14 @@ export function GameBuilderTest() {
                   <div className="font-bold mb-1">
                     {msg.role === 'user' ? 'You' : 'Claude'}
                   </div>
-                  <Streamdown>{msg.content}</Streamdown>
+                  <Markdown>{msg.content}</Markdown>
                 </div>
               ))}
 
             {streamingResponse && (
               <div className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[10%]">
                 <div className="font-bold mb-1">Claude</div>
-                <Streamdown isAnimating={isStreaming}>
-                  {streamingResponse}
-                </Streamdown>
+                <Markdown>{streamingResponse}</Markdown>
               </div>
             )}
           </div>
@@ -254,7 +252,7 @@ export function GameBuilderTest() {
                     onClick={async () => {
                       const template = await invoke<GameTemplate>(
                         'get_game_template',
-                        { key }
+                        { key },
                       )
                       previewGame(template.code)
                     }}
@@ -300,9 +298,7 @@ export function GameBuilderTest() {
         </div>
       </div>
 
-      {previewCode && (
-        <GamePreview code={previewCode} onClose={closePreview} />
-      )}
+      {previewCode && <GamePreview code={previewCode} onClose={closePreview} />}
     </div>
   )
 }

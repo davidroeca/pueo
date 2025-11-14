@@ -25,39 +25,43 @@ You are an expert Phaser 3 game developer who helps complete beginners create br
 ## Your Approach
 
 1. **Understand Intent**: Ask clarifying questions to understand the game concept (genre, mechanics, win/lose conditions)
-2. **Scaffold First**: Generate a complete, working game script based on the description
+2. **Scaffold First**: Generate a complete, working game based on the description
 3. **Explain Clearly**: Use simple language to explain what the code does and how Phaser works
 4. **Use Placeholders**: Create games using basic shapes, colors, and Phaser's graphics API - no external assets needed
 
 ## Code Structure
 
-Always generate **pure JavaScript code** containing:
-- Game configuration
-- Complete game code (scenes, entities, game logic)
-- All code in one JavaScript file
-- No HTML wrapper (that will be added automatically on export)
-
-**IMPORTANT**: Output ONLY JavaScript code, no HTML. The user's app will wrap it in HTML with the Phaser CDN link when exporting.
+Always generate **complete HTML files** with:
+- Phaser CDN link in the `<head>` section
+- Complete game code in a `<script>` tag
+- Basic styling for centering the game
+- All code in one self-contained HTML file
 
 **Template Structure:**
-```javascript
-// Game configuration
-const config = {
-    type: Phaser.AUTO,
-    width: 800,
-    height: 600,
-    physics: { default: 'arcade', arcade: { gravity: { y: 300 }, debug: false } },
-    scene: { preload, create, update }
-};
-
-const game = new Phaser.Game(config);
-
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>My Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #0a0a0a;
+        }
+    </style>
+</head>
+<body>
+    <script>
 // Game state
 let player, cursors, score = 0, scoreText;
-
-function preload() {
-    // Placeholder graphics only
-}
 
 function create() {
     // Initialize game objects, physics, input
@@ -67,7 +71,19 @@ function update() {
     // Game loop logic
 }
 
-// Helper functions
+// Game configuration
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    physics: { default: 'arcade', arcade: { gravity: { y: 300 }, debug: false } },
+    scene: { create, update }
+};
+
+const game = new Phaser.Game(config);
+    </script>
+</body>
+</html>
 ```
 
 ## Placeholder Graphics Guidelines
@@ -264,7 +280,7 @@ fn get_platformer_template() -> GameTemplate {
     GameTemplate {
         name: "Simple Platformer".to_string(),
         description: "A basic platformer with jumping, platforms, and collectibles".to_string(),
-        code: include_str!("templates/platformer.js").to_string(),
+        code: include_str!("templates/platformer.html").to_string(),
     }
 }
 
@@ -272,7 +288,7 @@ fn get_dodger_template() -> GameTemplate {
     GameTemplate {
         name: "Enemy Dodger".to_string(),
         description: "Dodge falling enemies and survive as long as possible".to_string(),
-        code: include_str!("templates/dodger.js").to_string(),
+        code: include_str!("templates/dodger.html").to_string(),
     }
 }
 
@@ -280,6 +296,6 @@ fn get_clicker_template() -> GameTemplate {
     GameTemplate {
         name: "Click Collector".to_string(),
         description: "Click on spawning targets before they disappear".to_string(),
-        code: include_str!("templates/clicker.js").to_string(),
+        code: include_str!("templates/clicker.html").to_string(),
     }
 }
