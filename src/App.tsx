@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
-import Markdown from 'markdown-to-jsx'
+import { Markdown } from './components/Markdown'
 import { useChatStore } from './store/useChatStore'
 import { GameBuilderTest } from './components/GameBuilderTest'
 
@@ -100,7 +100,6 @@ function App() {
   return (
     <main className="m-0 pt-[5vh] flex flex-col justify-center text-center">
       <h1 className="text-center mb-4">Claude Chat via Rig</h1>
-
       {!isInitialized ? (
         <div className="max-w-[500px] mx-auto p-10">
           <h2>Initialize AI Client</h2>
@@ -190,7 +189,7 @@ function App() {
                     <div className="font-bold mb-1">
                       {msg.role === 'user' ? 'You' : 'Claude'}
                     </div>
-                    <Markdown>{msg.content}</Markdown>
+                    <Markdown content={msg.content} />
                   </div>
                 ))}
 
@@ -200,9 +199,7 @@ function App() {
                     className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[20%]"
                   >
                     <div className="font-bold mb-1">Claude</div>
-                    <Markdown>
-                      {streamingResponse}
-                    </Markdown>
+                    <Markdown content={streamingResponse} />
                   </div>
                 )}
               </div>

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useChatStore, ChatMessage } from '../store/useChatStore'
-import Markdown from 'markdown-to-jsx'
 import { downloadGame, extractCodeFromMarkdown } from '../utils/gameExport'
+import { Markdown } from './Markdown'
 import { GamePreview } from './GamePreview'
 
 interface GameTemplate {
@@ -173,14 +173,14 @@ export function GameBuilderTest() {
                   <div className="font-bold mb-1">
                     {msg.role === 'user' ? 'You' : 'Claude'}
                   </div>
-                  <Markdown>{msg.content}</Markdown>
+                  <Markdown content={msg.content} />
                 </div>
               ))}
 
             {streamingResponse && (
               <div className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[10%]">
                 <div className="font-bold mb-1">Claude</div>
-                <Markdown>{streamingResponse}</Markdown>
+                <Markdown content={streamingResponse} />
               </div>
             )}
           </div>
