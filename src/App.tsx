@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
-import { Markdown } from './components/Markdown'
-import { useChatStore } from './store/useChatStore'
-import { GameBuilderTest } from './components/GameBuilderTest'
+import { Markdown } from '@/components/Markdown'
+import { useChatStore } from '@/store/useChatStore'
+import { GameBuilderTest } from '@/components/GameBuilderTest'
 
 function App() {
   const [activeTab, setActiveTab] = useState<'chat' | 'game-builder'>('chat')

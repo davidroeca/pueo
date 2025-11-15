@@ -9,7 +9,7 @@ import type {
   HighlightRequest,
   HighlightErrorResponse,
   HighlightSuccessResponse,
-} from '../types/highlighter'
+} from '@/types/highlighter'
 
 let highlighter: Highlighter | null = null
 let initializationPromise: Promise<void> | null = null

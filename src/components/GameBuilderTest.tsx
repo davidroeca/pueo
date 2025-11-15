@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { useChatStore, ChatMessage } from '../store/useChatStore'
-import { downloadGame, extractCodeFromMarkdown } from '../utils/gameExport'
-import { Markdown } from './Markdown'
-import { GamePreview } from './GamePreview'
+import { useChatStore, ChatMessage } from '@/store/useChatStore'
+import { downloadGame, extractCodeFromMarkdown } from '@/utils/gameExport'
+import { Markdown } from '@/components/Markdown'
+import { GamePreview } from '@/components/GamePreview'
 
 interface GameTemplate {
   name: string

@@ -1,5 +1,5 @@
 import BaseMarkdown from 'markdown-to-jsx'
-import { CodeBlock } from './CodeBlock'
+import { CodeBlock } from '@/components/CodeBlock'
 
 interface BaseMarkdownProps {
   content: string

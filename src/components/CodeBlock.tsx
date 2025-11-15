@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { highlightCode } from '../highlighter'
+import { useThrottledDebounce } from '@/hooks/useThrottledDebounce'
+import { highlightCode } from '@/highlighter'
 
 interface CodeBlockProps {
   className?: string
@@ -12,8 +13,7 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
   const [error, setError] = useState<Error | null>(null)
 
   const lang = className?.replace(/^lang-/, '') || 'text'
-  const code = String(children).trim()
-
+  const code = useThrottledDebounce(String(children).trim())
   useEffect(() => {
     let cancelled = false
 
