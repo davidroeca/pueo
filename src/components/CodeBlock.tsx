@@ -29,19 +29,11 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
   const lang = className?.replace(/^lang-/, '') || 'text'
   const rawCode = String(children)
 
-  // Split into complete lines and incomplete line
-  const hasIncompleteLastLine = rawCode.length > 0 && !rawCode.endsWith('\n')
+  // Extract only complete lines (ending with \n)
   const lastNewlineIndex = rawCode.lastIndexOf('\n')
-
-  const completeLines =
-    hasIncompleteLastLine && lastNewlineIndex >= 0
-      ? rawCode.slice(0, lastNewlineIndex + 1)
-      : rawCode
-
-  const incompleteLine =
-    hasIncompleteLastLine && lastNewlineIndex >= 0
-      ? rawCode.slice(lastNewlineIndex + 1)
-      : ''
+  const completeLines = lastNewlineIndex >= 0
+    ? rawCode.slice(0, lastNewlineIndex + 1)
+    : ''
 
   const code = useThrottledDebounce(completeLines)
 
@@ -86,24 +78,14 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
     )
   }
 
-  // Show previous highlighted version (or raw code if first load)
-  // with optional loading indicator
+  // Show highlighted code (only complete lines)
   return (
     <div className="relative pb-4">
       {html ? (
-        <div>
-          <HighlightedCode html={html} />
-          {incompleteLine && (
-            <pre className={PRE_CLASS}>
-              <code>
-                <span className="line">{escapeHtml(incompleteLine)}</span>
-              </code>
-            </pre>
-          )}
-        </div>
+        <HighlightedCode html={html} />
       ) : (
         <pre className={className}>
-          <code>{escapeHtml(rawCode)}</code>
+          <code>{escapeHtml(completeLines)}</code>
         </pre>
       )}
     </div>
