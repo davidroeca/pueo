@@ -6,14 +6,16 @@ use rig::providers::anthropic;
 use rig::streaming::{StreamedAssistantContent, StreamingChat, StreamingPrompt};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tauri::{Emitter, State, Window};
+use tauri::{Emitter, Manager, State, Window};
 use tokio::sync::Mutex;
 
+mod db;
 mod game_builder;
 
-// Shared state for the LLM client
+// Shared state for the LLM client and database
 pub struct AppState {
     client: Arc<Mutex<Option<anthropic::Client>>>,
+    db: Arc<db::Database>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -46,6 +48,100 @@ async fn init_ai(state: State<'_, AppState>, api_key: String) -> Result<String, 
     let mut client_guard = state.client.lock().await;
     *client_guard = Some(client);
     Ok("AI client initialized successfully".to_string())
+}
+
+// Stream chat completion with game builder tool
+#[tauri::command]
+async fn stream_game_builder(
+    window: Window,
+    state: State<'_, AppState>,
+    messages: Vec<ChatMessage>,
+    model: Option<String>,
+) -> Result<(), String> {
+    // Get the client from state
+    let client_guard = state.client.lock().await;
+    let client = client_guard
+        .as_ref()
+        .ok_or("AI client not initialized. Call init_ai first.")?;
+
+    // Use specified model or default to claude-sonnet-4-5
+    let model_name = model.unwrap_or_else(|| "claude-sonnet-4-5-20250929".to_string());
+
+    // Build the chat history - separate system messages, last user message, and history
+    let mut system_prompt = game_builder::get_system_prompt();
+    let mut history = Vec::new();
+    let mut last_user_message = String::new();
+
+    for msg in messages {
+        match msg.role.as_str() {
+            "system" => {
+                system_prompt.push_str("\n");
+                system_prompt.push_str(&msg.content);
+            }
+            "user" => {
+                last_user_message = msg.content;
+            }
+            "assistant" => {
+                // Add previous user message and this assistant response to history
+                if !last_user_message.is_empty() {
+                    history.push(Message::user(&last_user_message));
+                    last_user_message = String::new();
+                }
+                history.push(Message::assistant(&msg.content));
+            }
+            _ => return Err(format!("Unknown role: {}", msg.role)),
+        }
+    }
+
+    // Create agent with the Phaser game tool
+    let agent = client
+        .agent(&model_name)
+        .preamble(&system_prompt)
+        .tool(game_builder::create_phaser_game_tool())
+        .build();
+
+    // Create streaming completion
+    let mut stream = if history.is_empty() {
+        // Simple prompt if no history
+        agent.stream_prompt(&last_user_message).await
+    } else {
+        // Chat with history
+        agent.stream_chat(&last_user_message, history).await
+    };
+
+    // Stream tokens to frontend
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => match chunk {
+                MultiTurnStreamItem::StreamItem(item) => {
+                    if let StreamedAssistantContent::Text(text) = item {
+                        window
+                            .emit("chat-token", &text.text)
+                            .map_err(|e| format!("Failed to emit token: {}", e))?;
+                    }
+                }
+                MultiTurnStreamItem::FinalResponse(response) => {
+                    window
+                        .emit("chat-final-response", &response.response())
+                        .map_err(|e| format!("Failed to emit final response: {}", e))?;
+                }
+                _ => (),
+            },
+            Err(e) => {
+                window
+                    .emit("chat-error", format!("Stream error: {}", e))
+                    .map_err(|e| format!("Failed to emit error: {}", e))?;
+                return Err(format!("Stream error: {}", e));
+            }
+        }
+    }
+
+    // Signal completion
+    window
+        .emit("chat-complete", ())
+        .map_err(|e| format!("Failed to emit completion: {}", e))?;
+
+    Ok(())
 }
 
 // Stream chat completion to frontend
@@ -231,6 +327,97 @@ fn get_common_patterns() -> game_builder::CommonPatterns {
     game_builder::get_common_patterns()
 }
 
+// Database commands for game persistence
+#[tauri::command]
+async fn save_game(
+    state: State<'_, AppState>,
+    spec: game_builder::PhaserGameSpec,
+) -> Result<db::GameRecord, String> {
+    state
+        .db
+        .create_game(spec)
+        .await
+        .map_err(|e| format!("Failed to save game: {}", e))
+}
+
+#[tauri::command]
+async fn get_game(state: State<'_, AppState>, id: String) -> Result<db::GameRecord, String> {
+    state
+        .db
+        .get_game(&id)
+        .await
+        .map_err(|e| format!("Failed to get game: {}", e))
+}
+
+#[tauri::command]
+async fn update_game(
+    state: State<'_, AppState>,
+    id: String,
+    spec: game_builder::PhaserGameSpec,
+    notes: Option<String>,
+) -> Result<db::GameRecord, String> {
+    state
+        .db
+        .update_game(&id, spec, notes)
+        .await
+        .map_err(|e| format!("Failed to update game: {}", e))
+}
+
+#[tauri::command]
+async fn delete_game(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    state
+        .db
+        .delete_game(&id)
+        .await
+        .map_err(|e| format!("Failed to delete game: {}", e))
+}
+
+#[tauri::command]
+async fn list_games(state: State<'_, AppState>) -> Result<Vec<db::GameSummary>, String> {
+    state
+        .db
+        .list_games()
+        .await
+        .map_err(|e| format!("Failed to list games: {}", e))
+}
+
+#[tauri::command]
+async fn search_games(
+    state: State<'_, AppState>,
+    query: String,
+) -> Result<Vec<db::GameSummary>, String> {
+    state
+        .db
+        .search_games(&query)
+        .await
+        .map_err(|e| format!("Failed to search games: {}", e))
+}
+
+#[tauri::command]
+async fn get_game_versions(
+    state: State<'_, AppState>,
+    game_id: String,
+) -> Result<Vec<db::GameVersion>, String> {
+    state
+        .db
+        .get_game_versions(&game_id)
+        .await
+        .map_err(|e| format!("Failed to get game versions: {}", e))
+}
+
+#[tauri::command]
+async fn get_game_version(
+    state: State<'_, AppState>,
+    game_id: String,
+    version: i64,
+) -> Result<db::GameVersion, String> {
+    state
+        .db
+        .get_game_version(&game_id, version)
+        .await
+        .map_err(|e| format!("Failed to get game version: {}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Try to load .env file (ignore if it doesn't exist)
@@ -248,19 +435,48 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(AppState {
-            client: Arc::new(Mutex::new(initial_client)),
+        .setup(|app| {
+            // Initialize database in app data directory
+            let app_handle = app.handle();
+            tauri::async_runtime::block_on(async move {
+                let app_data_dir = app_handle
+                    .path()
+                    .app_data_dir()
+                    .expect("Failed to get app data directory");
+
+                let db_path = app_data_dir.join("games.db");
+
+                let database = db::Database::new(db_path)
+                    .await
+                    .expect("Failed to initialize database");
+
+                app_handle.manage(AppState {
+                    client: Arc::new(Mutex::new(initial_client)),
+                    db: Arc::new(database),
+                });
+            });
+
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             greet,
             is_ai_initialized,
             init_ai,
             stream_chat,
+            stream_game_builder,
             chat_completion,
             get_game_builder_prompt,
             get_game_template,
             get_game_template_list,
-            get_common_patterns
+            get_common_patterns,
+            save_game,
+            get_game,
+            update_game,
+            delete_game,
+            list_games,
+            search_games,
+            get_game_versions,
+            get_game_version
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,10 +1,12 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { useChatStore } from '@/store/useChatStore'
 import { GameBuilder } from '@/components/GameBuilder'
+import { GameRendererTest } from '@/components/GameRendererTest'
 import { Logo } from '@/components/Logo'
 
 function App() {
+  const [showTest, setShowTest] = useState(false)
   const {
     apiKey,
     setApiKey,
@@ -97,7 +99,18 @@ function App() {
       <div className="flex flex-row justify-center gap-3 items-center">
         <Logo className="h-[80px] w-[80px]" />
         <h1 className="text-center text-4xl font-bold">Pueo</h1>
+        <button
+          onClick={() => setShowTest(!showTest)}
+          className="ml-4 text-sm rounded-lg border border-transparent px-3 py-2 text-gray-900 bg-gray-200 dark:text-white dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+        >
+          {showTest ? 'Back to Chat' : 'Test Renderer'}
+        </button>
       </div>
+      {showTest ? (
+        <GameRendererTest />
+      ) : (
+        <>
+
       {!isInitialized ? (
         <div className="max-w-[500px] mx-auto p-10">
           <h2>Initialize AI Client</h2>
@@ -141,6 +154,8 @@ function App() {
         <div className="w-full px-5">
           <GameBuilder />
         </div>
+      )}
+        </>
       )}
     </main>
   )
