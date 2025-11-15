@@ -1,27 +1,11 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { useChatStore, ChatMessage } from '@/store/useChatStore'
+import { useChatStore, ChatMessage, GameTemplate } from '@/store/useChatStore'
 import { downloadGame, extractCodeFromMarkdown } from '@/utils/gameExport'
 import { Markdown } from '@/components/Markdown'
 import { GamePreview } from '@/components/GamePreview'
 
-interface GameTemplate {
-  name: string
-  description: string
-  code: string
-}
-
 export function GameBuilderTest() {
-  const [templates, setTemplates] = useState<[string, string, string][] | null>(
-    null,
-  )
-  const [selectedTemplate, setSelectedTemplate] = useState<GameTemplate | null>(
-    null,
-  )
-  const [isGameBuilderMode, setIsGameBuilderMode] = useState(false)
-  const [systemPrompt, setSystemPrompt] = useState<string>('')
-  const [previewCode, setPreviewCode] = useState<string | null>(null)
-
   const {
     messages,
     input,
@@ -32,6 +16,14 @@ export function GameBuilderTest() {
     sendStreamingMessage,
     clearChat,
     setMessages,
+    templates,
+    setTemplates,
+    selectedTemplate,
+    setSelectedTemplate,
+    systemPrompt,
+    setSystemPrompt,
+    previewCode,
+    setPreviewCode,
   } = useChatStore()
 
   // Load templates on mount
@@ -40,15 +32,6 @@ export function GameBuilderTest() {
       .then(setTemplates)
       .catch(console.error)
   }, [])
-
-  // Load system prompt when entering game builder mode
-  useEffect(() => {
-    if (isGameBuilderMode && !systemPrompt) {
-      invoke<string>('get_game_builder_prompt')
-        .then(setSystemPrompt)
-        .catch(console.error)
-    }
-  }, [isGameBuilderMode, systemPrompt])
 
   const loadTemplate = async (key: string) => {
     try {
@@ -59,28 +42,20 @@ export function GameBuilderTest() {
     }
   }
 
-  const toggleGameBuilderMode = () => {
-    if (!isGameBuilderMode) {
-      // Entering game builder mode
-      clearChat()
-      setIsGameBuilderMode(true)
-    } else {
-      // Exiting game builder mode
-      setIsGameBuilderMode(false)
-      setSelectedTemplate(null)
-    }
-  }
-
   const handleSendMessage = async () => {
-    if (!isGameBuilderMode) {
-      await sendStreamingMessage()
-      return
-    }
-
-    // In game builder mode, prepend system prompt
-    const systemMessage: ChatMessage = {
-      role: 'system',
-      content: systemPrompt,
+    let systemMessage: ChatMessage
+    if (systemPrompt) {
+      systemMessage = {
+        role: 'system',
+        content: systemPrompt,
+      }
+    } else {
+      const newSystemPrompt = await invoke<string>('get_game_builder_prompt')
+      setSystemPrompt(newSystemPrompt)
+      systemMessage = {
+        role: 'system',
+        content: newSystemPrompt,
+      }
     }
 
     // Temporarily inject system message
@@ -129,31 +104,9 @@ export function GameBuilderTest() {
 
   return (
     <div className="max-w-[1200px] mx-auto px-5 py-10">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-left items-center mb-6">
         <h2 className="text-2xl font-bold">Game Builder Test Interface</h2>
-        <button
-          onClick={toggleGameBuilderMode}
-          className={`rounded-lg border border-transparent px-5 py-3 text-base font-medium transition-colors shadow-sm cursor-pointer ${
-            isGameBuilderMode
-              ? 'bg-red-600 text-white hover:bg-red-700'
-              : 'bg-green-600 text-white hover:bg-green-700'
-          }`}
-        >
-          {isGameBuilderMode
-            ? 'Exit Game Builder Mode'
-            : 'Enter Game Builder Mode'}
-        </button>
       </div>
-
-      {isGameBuilderMode && (
-        <div className="mb-5 p-4 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-          <p className="text-sm">
-            <strong>Game Builder Mode Active:</strong> Your messages will
-            include the Phaser game builder system prompt automatically.
-          </p>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
         <div className="md:col-span-2">
           <h3 className="text-xl font-semibold mb-3">Chat</h3>
@@ -202,11 +155,7 @@ export function GameBuilderTest() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={
-                isGameBuilderMode
-                  ? 'Describe the game you want to build...'
-                  : 'Type your message...'
-              }
+              placeholder={'Describe the game you want to build...'}
               disabled={isStreaming}
               className="flex-1 rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-50"
             />

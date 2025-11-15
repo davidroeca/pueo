@@ -7,6 +7,8 @@ interface CodeBlockProps {
   children: React.ReactNode
 }
 
+const PRE_CLASS = 'overflow-x-auto p-2 rounded-md scrollbar-thin scrollbar-thumb-gray-800'
+
 // Memoized component to prevent re-renders when HTML hasn't changed
 const HighlightedCode = memo(({ html }: { html: string }) => {
   return <div dangerouslySetInnerHTML={{ __html: html }} />
@@ -45,13 +47,7 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
     const abortController = new AbortController()
     setError(null)
 
-    highlightCode(
-      code,
-      lang,
-      true,
-      'overflow-x-auto p-2 rounded-sm',
-      abortController.signal,
-    )
+    highlightCode(code, lang, true, PRE_CLASS, abortController.signal)
       .then((result) => {
         if (!abortController.signal.aborted) {
           setHtml(result)
@@ -85,12 +81,12 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
   // Show previous highlighted version (or raw code if first load)
   // with optional loading indicator
   return (
-    <div className="relative">
+    <div className="relative pb-4">
       {html ? (
         <div>
           <HighlightedCode html={html} />
           {incompleteLine && (
-            <pre className="overflow-x-auto p-2 rounded-sm">
+            <pre className={PRE_CLASS}>
               <code>
                 <span className="line">{incompleteLine}</span>
               </code>

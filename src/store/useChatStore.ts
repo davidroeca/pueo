@@ -6,6 +6,12 @@ export interface ChatMessage {
   content: string
 }
 
+export interface GameTemplate {
+  name: string
+  description: string
+  code: string
+}
+
 interface ChatStore {
   // AI Initialization state
   apiKey: string
@@ -19,6 +25,12 @@ interface ChatStore {
   isStreaming: boolean
   error: string
   model: string
+
+  // Game Builder state
+  templates: [string, string, string][] | null
+  selectedTemplate: GameTemplate | null
+  systemPrompt: string
+  previewCode: string | null
 
   // AI Initialization actions
   setApiKey: (key: string) => void
@@ -38,6 +50,12 @@ interface ChatStore {
   sendNonStreamingMessage: () => Promise<void>
   clearChat: () => void
   checkInitialization: () => Promise<void>
+
+  // Game Builder actions
+  setTemplates: (templates: [string, string, string][] | null) => void
+  setSelectedTemplate: (template: GameTemplate | null) => void
+  setSystemPrompt: (prompt: string) => void
+  setPreviewCode: (code: string | null) => void
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -51,6 +69,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isStreaming: false,
   error: '',
   model: 'claude-sonnet-4-5-20250929',
+
+  // Game Builder initial state
+  templates: null,
+  selectedTemplate: null,
+  systemPrompt: '',
+  previewCode: null,
 
   // AI Initialization actions
   setApiKey: (key) => set({ apiKey: key }),
@@ -150,4 +174,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       streamingResponse: '',
       error: '',
     }),
+
+  // Game Builder actions
+  setTemplates: (templates) => set({ templates }),
+  setSelectedTemplate: (template) => set({ selectedTemplate: template }),
+  setSystemPrompt: (prompt) => set({ systemPrompt: prompt }),
+  setPreviewCode: (code) => set({ previewCode: code }),
 }))

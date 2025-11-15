@@ -11,15 +11,7 @@ function App() {
     setApiKey,
     isInitialized,
     initError,
-    messages,
-    input,
-    setInput,
-    streamingResponse,
-    isStreaming,
-    error,
     initializeAI,
-    sendStreamingMessage,
-    clearChat,
     checkInitialization,
     appendStreamingResponse,
     setStreamingResponse,
@@ -141,102 +133,7 @@ function App() {
         </div>
       ) : (
         <div className="w-full px-5">
-          {/* Tabs */}
-          <div className="flex justify-center gap-2 mb-6">
-            <button
-              onClick={() => setActiveTab('chat')}
-              className={`rounded-lg border px-5 py-3 text-base font-medium transition-colors shadow-sm cursor-pointer ${
-                activeTab === 'chat'
-                  ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                  : 'border-transparent bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white hover:border-gray-400'
-              }`}
-            >
-              Normal Chat
-            </button>
-            <button
-              onClick={() => setActiveTab('game-builder')}
-              className={`rounded-lg border px-5 py-3 text-base font-medium transition-colors shadow-sm cursor-pointer ${
-                activeTab === 'game-builder'
-                  ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                  : 'border-transparent bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white hover:border-gray-400'
-              }`}
-            >
-              Game Builder Test
-            </button>
-          </div>
-
-          {activeTab === 'chat' ? (
-            <div className="max-w-[800px] mx-auto">
-              <div className="mb-5 text-right">
-                <button
-                  onClick={clearChat}
-                  className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm hover:border-blue-600 active:bg-gray-200 dark:active:bg-gray-900/40 cursor-pointer"
-                >
-                  Clear Chat
-                </button>
-              </div>
-
-              <div className="max-w-screen min-h-[400px] max-h-[800px] overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-5 mb-5 bg-white dark:bg-gray-900 text-left">
-                {messages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`mb-4 p-2.5 rounded-md ${
-                      msg.role === 'user'
-                        ? 'bg-blue-50 dark:bg-blue-900/30 ml-[20%]'
-                        : 'bg-gray-100 dark:bg-gray-800 mr-[20%]'
-                    }`}
-                  >
-                    <div className="font-bold mb-1">
-                      {msg.role === 'user' ? 'You' : 'Claude'}
-                    </div>
-                    <Markdown content={msg.content} />
-                  </div>
-                ))}
-
-                {streamingResponse && (
-                  <div
-                    key={messages.length + 1}
-                    className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[20%]"
-                  >
-                    <div className="font-bold mb-1">Claude</div>
-                    <Markdown content={streamingResponse} />
-                  </div>
-                )}
-              </div>
-
-              {error && (
-                <p className="text-red-600 mb-3 dark:text-red-400">
-                  Error: {error}
-                </p>
-              )}
-
-              <form
-                className="flex gap-2.5 items-center"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  sendStreamingMessage()
-                }}
-              >
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Type your message..."
-                  disabled={isStreaming}
-                  className="flex-1 rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-50"
-                />
-                <button
-                  type="submit"
-                  disabled={isStreaming}
-                  className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm hover:border-blue-600 active:bg-gray-200 dark:active:bg-gray-900/40 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Stream
-                </button>
-              </form>
-            </div>
-          ) : (
-            <GameBuilderTest />
-          )}
+          <GameBuilderTest />
         </div>
       )}
     </main>
