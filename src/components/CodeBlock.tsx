@@ -14,7 +14,6 @@ const HighlightedCode = memo(({ html }: { html: string }) => {
 
 export function CodeBlock({ className, children }: CodeBlockProps) {
   const [html, setHtml] = useState<string>('')
-  const [isHighlighting, setIsHighlighting] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
   const lang = className?.replace(/^lang-/, '') || 'text'
@@ -40,12 +39,10 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
     // Don't highlight if there's no complete code
     if (!code) {
       setHtml('')
-      setIsHighlighting(false)
       return
     }
 
     const abortController = new AbortController()
-    setIsHighlighting(true)
     setError(null)
 
     highlightCode(
@@ -68,11 +65,6 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
         }
         if (!abortController.signal.aborted) {
           setError(err instanceof Error ? err : new Error('Unknown error'))
-        }
-      })
-      .finally(() => {
-        if (!abortController.signal.aborted) {
-          setIsHighlighting(false)
         }
       })
 
@@ -109,11 +101,6 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
         <pre className={className}>
           <code>{rawCode}</code>
         </pre>
-      )}
-      {isHighlighting && html && (
-        <div className="absolute top-1 right-1 opacity-50">
-          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-        </div>
       )}
     </div>
   )
