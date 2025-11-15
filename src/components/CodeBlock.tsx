@@ -18,13 +18,43 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
   const [error, setError] = useState<Error | null>(null)
 
   const lang = className?.replace(/^lang-/, '') || 'text'
-  const code = useThrottledDebounce(String(children).trim())
+  const rawCode = String(children)
+
+  // Split into complete lines and incomplete line
+  const hasIncompleteLastLine = rawCode.length > 0 && !rawCode.endsWith('\n')
+  const lastNewlineIndex = rawCode.lastIndexOf('\n')
+
+  const completeLines =
+    hasIncompleteLastLine && lastNewlineIndex >= 0
+      ? rawCode.slice(0, lastNewlineIndex + 1)
+      : rawCode
+
+  const incompleteLine =
+    hasIncompleteLastLine && lastNewlineIndex >= 0
+      ? rawCode.slice(lastNewlineIndex + 1)
+      : ''
+
+  const code = useThrottledDebounce(completeLines)
+
   useEffect(() => {
+    // Don't highlight if there's no complete code
+    if (!code) {
+      setHtml('')
+      setIsHighlighting(false)
+      return
+    }
+
     const abortController = new AbortController()
     setIsHighlighting(true)
     setError(null)
 
-    highlightCode(code, lang, true, 'overflow-x-auto p-2 rounded-sm', abortController.signal)
+    highlightCode(
+      code,
+      lang,
+      true,
+      'overflow-x-auto p-2 rounded-sm',
+      abortController.signal,
+    )
       .then((result) => {
         if (!abortController.signal.aborted) {
           setHtml(result)
@@ -33,7 +63,7 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
       })
       .catch((err) => {
         // Ignore abort errors
-        if (err.message === 'Request aborted') {
+        if (err instanceof DOMException && err.message === 'Request aborted') {
           return
         }
         if (!abortController.signal.aborted) {
@@ -65,10 +95,19 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
   return (
     <div className="relative">
       {html ? (
-        <HighlightedCode html={html} />
+        <div>
+          <HighlightedCode html={html} />
+          {incompleteLine && (
+            <pre className="overflow-x-auto p-2 rounded-sm">
+              <code>
+                <span className="line">{incompleteLine}</span>
+              </code>
+            </pre>
+          )}
+        </div>
       ) : (
         <pre className={className}>
-          <code>{children}</code>
+          <code>{rawCode}</code>
         </pre>
       )}
       {isHighlighting && html && (

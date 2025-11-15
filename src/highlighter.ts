@@ -73,7 +73,7 @@ class HighlighterService {
         const pending = this.pendingRequests.get(id)
         if (pending) {
           this.pendingRequests.delete(id)
-          pending.reject(new Error('Request aborted'))
+          pending.reject(new DOMException('Request aborted'))
         }
       })
     }
