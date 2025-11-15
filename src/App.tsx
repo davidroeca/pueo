@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { useChatStore } from '@/store/useChatStore'
 import { GameBuilder } from '@/components/GameBuilder'
+import { Logo } from '@/components/Logo'
 
 function App() {
   const {
@@ -93,7 +94,10 @@ function App() {
 
   return (
     <main className="m-0 pt-[5vh] flex flex-col justify-center text-center">
-      <h1 className="text-center mb-4">Claude Chat via Rig</h1>
+      <div className="flex flex-row justify-center gap-3 items-center">
+        <Logo className="h-[80px] w-[80px]" />
+        <h1 className="text-center text-4xl font-bold">Pueo</h1>
+      </div>
       {!isInitialized ? (
         <div className="max-w-[500px] mx-auto p-10">
           <h2>Initialize AI Client</h2>
