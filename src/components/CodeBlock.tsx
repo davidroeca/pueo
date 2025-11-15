@@ -9,6 +9,14 @@ interface CodeBlockProps {
 
 const PRE_CLASS = 'overflow-x-auto p-2 rounded-md scrollbar-thin scrollbar-thumb-gray-800'
 
+const escapeHtml = (html: string) =>
+  html
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+
 // Memoized component to prevent re-renders when HTML hasn't changed
 const HighlightedCode = memo(({ html }: { html: string }) => {
   return <div dangerouslySetInnerHTML={{ __html: html }} />
@@ -88,14 +96,14 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
           {incompleteLine && (
             <pre className={PRE_CLASS}>
               <code>
-                <span className="line">{incompleteLine}</span>
+                <span className="line">{escapeHtml(incompleteLine)}</span>
               </code>
             </pre>
           )}
         </div>
       ) : (
         <pre className={className}>
-          <code>{rawCode}</code>
+          <code>{escapeHtml(rawCode)}</code>
         </pre>
       )}
     </div>

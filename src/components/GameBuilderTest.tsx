@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useChatStore, ChatMessage, GameTemplate } from '@/store/useChatStore'
 import { downloadGame, extractCodeFromMarkdown } from '@/utils/gameExport'
@@ -46,6 +46,7 @@ export function GameBuilderTest() {
     let systemMessage: ChatMessage
     if (systemPrompt) {
       systemMessage = {
+        id: crypto.randomUUID(),
         role: 'system',
         content: systemPrompt,
       }
@@ -53,6 +54,7 @@ export function GameBuilderTest() {
       const newSystemPrompt = await invoke<string>('get_game_builder_prompt')
       setSystemPrompt(newSystemPrompt)
       systemMessage = {
+        id: crypto.randomUUID(),
         role: 'system',
         content: newSystemPrompt,
       }
@@ -111,12 +113,12 @@ export function GameBuilderTest() {
         <div className="md:col-span-2">
           <h3 className="text-xl font-semibold mb-3">Chat</h3>
 
-          <div className="min-h-[400px] max-h-[600px] overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-5 mb-5 bg-white dark:bg-gray-900">
+          <div className="min-h-[400px] max-h-[600px] text-left overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-5 mb-5 bg-white dark:bg-gray-900">
             {messages
               .filter((msg) => msg.role !== 'system')
-              .map((msg, idx) => (
+              .map((msg) => (
                 <div
-                  key={idx}
+                  key={msg.id}
                   className={`mb-4 p-2.5 rounded-md ${
                     msg.role === 'user'
                       ? 'bg-blue-50 dark:bg-blue-900/30 ml-[10%]'
@@ -124,7 +126,7 @@ export function GameBuilderTest() {
                   }`}
                 >
                   <div className="font-bold mb-1">
-                    {msg.role === 'user' ? 'You' : 'Claude'}
+                    {msg.role === 'user' ? 'You' : 'Assistant'}
                   </div>
                   <Markdown content={msg.content} />
                 </div>
@@ -132,7 +134,7 @@ export function GameBuilderTest() {
 
             {streamingResponse && (
               <div className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[10%]">
-                <div className="font-bold mb-1">Claude</div>
+                <div className="font-bold mb-1">Assistant</div>
                 <Markdown content={streamingResponse} />
               </div>
             )}

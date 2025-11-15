@@ -1,11 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
-import { Markdown } from '@/components/Markdown'
 import { useChatStore } from '@/store/useChatStore'
 import { GameBuilderTest } from '@/components/GameBuilderTest'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'chat' | 'game-builder'>('chat')
   const {
     apiKey,
     setApiKey,
@@ -46,7 +44,11 @@ function App() {
         (event) => {
           // When we receive the final response, add it to messages immediately
           const finalContent = event.payload
-          addMessage({ role: 'assistant', content: finalContent })
+          addMessage({
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: finalContent,
+          })
           setStreamingResponse('')
           setIsStreaming(false)
         },

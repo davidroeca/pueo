@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 
 export interface ChatMessage {
+  id: string
   role: 'assistant' | 'system' | 'user'
   content: string
 }
@@ -118,7 +119,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (!input.trim()) return
 
     set({ error: '' })
-    const userMessage: ChatMessage = { role: 'user', content: input }
+    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: input }
     const updatedMessages = [...messages, userMessage]
     set({
       messages: updatedMessages,
@@ -142,7 +143,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (!input.trim()) return
 
     set({ error: '' })
-    const userMessage: ChatMessage = { role: 'user', content: input }
+    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: input }
     const updatedMessages = [...messages, userMessage]
     set({
       messages: updatedMessages,
@@ -159,7 +160,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       set({
         messages: [
           ...updatedMessages,
-          { role: 'assistant', content: response },
+          { id: crypto.randomUUID(), role: 'assistant', content: response },
         ],
         isStreaming: false,
       })
