@@ -5,7 +5,7 @@ import { downloadGame, extractCodeFromMarkdown } from '@/utils/gameExport'
 import { Markdown } from '@/components/Markdown'
 import { GamePreview } from '@/components/GamePreview'
 
-export function GameBuilderTest() {
+export function GameBuilder() {
   const {
     messages,
     input,
@@ -107,7 +107,7 @@ export function GameBuilderTest() {
   return (
     <div className="max-w-[1200px] mx-auto px-5 py-10">
       <div className="flex justify-left items-center mb-6">
-        <h2 className="text-2xl font-bold">Game Builder Test Interface</h2>
+        <h2 className="text-2xl font-bold">Game Builder Interface</h2>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
         <div className="md:col-span-2">

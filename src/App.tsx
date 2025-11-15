@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { useChatStore } from '@/store/useChatStore'
-import { GameBuilderTest } from '@/components/GameBuilderTest'
+import { GameBuilder } from '@/components/GameBuilder'
 
 function App() {
   const {
@@ -135,7 +135,7 @@ function App() {
         </div>
       ) : (
         <div className="w-full px-5">
-          <GameBuilderTest />
+          <GameBuilder />
         </div>
       )}
     </main>
