@@ -49,7 +49,7 @@ function App() {
       })
 
       // Listen for reasoning (Claude thinking)
-      const unlistenReasoning = await listen<string>('reasoning', (event) => {
+      const unlistenReasoning = await listen<string>('reasoning', () => {
         // Show thinking indicator
         setActiveToolCall({ name: 'thinking', timestamp: Date.now() })
       })
