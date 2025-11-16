@@ -1,16 +1,11 @@
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
+import type { PhaserGameSpec } from '@/types/gameSpec'
 
 export interface ChatMessage {
   id: string
   role: 'assistant' | 'system' | 'user'
   content: string
-}
-
-export interface GameTemplate {
-  name: string
-  description: string
-  code: string
 }
 
 interface ChatStore {
@@ -26,12 +21,11 @@ interface ChatStore {
   isStreaming: boolean
   error: string
   model: string
+  activeToolCall: { name: string; timestamp: number } | null
 
   // Game Builder state
-  templates: [string, string, string][] | null
-  selectedTemplate: GameTemplate | null
   systemPrompt: string
-  previewCode: string | null
+  generatedGameSpec: PhaserGameSpec | null
 
   // AI Initialization actions
   setApiKey: (key: string) => void
@@ -46,17 +40,17 @@ interface ChatStore {
   appendStreamingResponse: (chunk: string) => void
   setIsStreaming: (value: boolean) => void
   setError: (error: string) => void
+  setActiveToolCall: (toolCall: { name: string; timestamp: number } | null) => void
   addMessage: (message: ChatMessage) => void
   sendStreamingMessage: () => Promise<void>
   sendNonStreamingMessage: () => Promise<void>
+  sendGameBuilderMessage: () => Promise<void>
   clearChat: () => void
   checkInitialization: () => Promise<void>
 
   // Game Builder actions
-  setTemplates: (templates: [string, string, string][] | null) => void
-  setSelectedTemplate: (template: GameTemplate | null) => void
   setSystemPrompt: (prompt: string) => void
-  setPreviewCode: (code: string | null) => void
+  setGeneratedGameSpec: (spec: PhaserGameSpec | null) => void
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
@@ -70,12 +64,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isStreaming: false,
   error: '',
   model: 'claude-sonnet-4-5-20250929',
+  activeToolCall: null,
 
   // Game Builder initial state
-  templates: null,
-  selectedTemplate: null,
   systemPrompt: '',
-  previewCode: null,
+  generatedGameSpec: null,
 
   // AI Initialization actions
   setApiKey: (key) => set({ apiKey: key }),
@@ -86,9 +79,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const { apiKey } = get()
     try {
       set({ initError: '' })
-      const result = await invoke<string>('init_ai', { apiKey })
+      await invoke<string>('init_ai', { apiKey })
       set({ isInitialized: true })
-      console.log(result)
     } catch (err) {
       set({ initError: String(err) })
     }
@@ -111,6 +103,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set((state) => ({ streamingResponse: state.streamingResponse + chunk })),
   setIsStreaming: (value) => set({ isStreaming: value }),
   setError: (error) => set({ error }),
+  setActiveToolCall: (toolCall) => set({ activeToolCall: toolCall }),
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
 
@@ -169,6 +162,30 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }
   },
 
+  sendGameBuilderMessage: async () => {
+    const { input, messages, model } = get()
+    if (!input.trim()) return
+
+    set({ error: '' })
+    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: input }
+    const updatedMessages = [...messages, userMessage]
+    set({
+      messages: updatedMessages,
+      input: '',
+      isStreaming: true,
+      streamingResponse: '',
+    })
+
+    try {
+      await invoke('stream_game_builder', {
+        messages: updatedMessages,
+        model,
+      })
+    } catch (err) {
+      set({ error: String(err), isStreaming: false })
+    }
+  },
+
   clearChat: () =>
     set({
       messages: [],
@@ -177,8 +194,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }),
 
   // Game Builder actions
-  setTemplates: (templates) => set({ templates }),
-  setSelectedTemplate: (template) => set({ selectedTemplate: template }),
   setSystemPrompt: (prompt) => set({ systemPrompt: prompt }),
-  setPreviewCode: (code) => set({ previewCode: code }),
+  setGeneratedGameSpec: (spec) => set({ generatedGameSpec: spec }),
 }))

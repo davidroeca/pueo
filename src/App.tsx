@@ -1,10 +1,16 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { useChatStore } from '@/store/useChatStore'
 import { GameBuilder } from '@/components/GameBuilder'
+import { GameLibrary } from '@/components/GameLibrary'
+import { GameRendererTest } from '@/components/GameRendererTest'
 import { Logo } from '@/components/Logo'
+import type { PhaserGameSpec } from '@/types/gameSpec'
+
+type View = 'chat' | 'library' | 'test'
 
 function App() {
+  const [currentView, setCurrentView] = useState<View>('chat')
   const {
     apiKey,
     setApiKey,
@@ -17,6 +23,8 @@ function App() {
     setIsStreaming,
     addMessage,
     setError,
+    setGeneratedGameSpec,
+    setActiveToolCall,
   } = useChatStore()
 
   // Check if AI is already initialized (from .env)
@@ -40,18 +48,47 @@ function App() {
         appendStreamingResponse(event.payload)
       })
 
+      // Listen for reasoning (Claude thinking)
+      const unlistenReasoning = await listen<string>('reasoning', (event) => {
+        // Show thinking indicator
+        setActiveToolCall({ name: 'thinking', timestamp: Date.now() })
+      })
+
+      // Listen for tool execution
+      const unlistenToolExecuting = await listen<string>('tool-executing', (event) => {
+        setActiveToolCall({ name: event.payload, timestamp: Date.now() })
+      })
+
+      // Listen for tool calls (from stream)
+      const unlistenToolCall = await listen<{ function: { name: string; arguments: unknown } }>(
+        'tool-call',
+        (event) => {
+          const toolCall = event.payload
+
+          if (toolCall.function.name === 'generate_phaser_game') {
+            const gameSpec = toolCall.function.arguments as PhaserGameSpec
+            setGeneratedGameSpec(gameSpec)
+          }
+
+          // Clear the tool execution indicator after successful extraction
+          setActiveToolCall(null)
+        }
+      )
+
       const unlistenFinalResponse = await listen<string>(
         'chat-final-response',
         (event) => {
-          // When we receive the final response, add it to messages immediately
+          // When we receive the final response, add it to messages
           const finalContent = event.payload
+
           addMessage({
             id: crypto.randomUUID(),
             role: 'assistant',
             content: finalContent,
           })
           setStreamingResponse('')
-          setIsStreaming(false)
+          // Don't clear activeToolCall here - extraction is about to start
+          // It will be cleared when tool-call or chat-complete arrives
         },
       )
 
@@ -60,6 +97,7 @@ function App() {
         // Just ensure streaming state is cleaned up
         setIsStreaming(false)
         setStreamingResponse('')
+        setActiveToolCall(null)  // Clear any remaining tool indicators
       })
 
       // Listen for errors
@@ -67,13 +105,25 @@ function App() {
         setError(event.payload)
         setIsStreaming(false)
         setStreamingResponse('')
+        setActiveToolCall(null)  // Clear tool indicators on error
+      })
+
+      // Listen for extraction failures
+      const unlistenExtractionFailed = await listen<string>('extraction-failed', () => {
+        setActiveToolCall(null)  // Clear the "Generating Game..." indicator
+        // Note: We don't set this as an error since the conversation was successful,
+        // just no game was generated (e.g., user asked a question instead)
       })
 
       unlisten = [
         unlistenToken,
+        unlistenReasoning,
+        unlistenToolExecuting,
+        unlistenToolCall,
         unlistenFinalResponse,
         unlistenComplete,
         unlistenError,
+        unlistenExtractionFailed,
       ]
     }
 
@@ -94,10 +144,57 @@ function App() {
 
   return (
     <main className="m-0 pt-[5vh] flex flex-col justify-center text-center">
-      <div className="flex flex-row justify-center gap-3 items-center">
-        <Logo className="h-[80px] w-[80px]" />
-        <h1 className="text-center text-4xl font-bold">Pueo</h1>
+      <div className="flex flex-col gap-4 items-center mb-6">
+        <div className="flex flex-row gap-3 items-center">
+          <Logo className="h-[80px] w-[80px]" />
+          <h1 className="text-center text-4xl font-bold">Pueo</h1>
+        </div>
+
+        {/* Navigation tabs */}
+        {isInitialized && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentView('chat')}
+              className={`text-sm rounded-lg border px-4 py-2 transition-colors ${
+                currentView === 'chat'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white border-transparent hover:border-blue-600'
+              }`}
+            >
+              Game Builder
+            </button>
+            <button
+              onClick={() => setCurrentView('library')}
+              className={`text-sm rounded-lg border px-4 py-2 transition-colors ${
+                currentView === 'library'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white border-transparent hover:border-blue-600'
+              }`}
+            >
+              Library
+            </button>
+            <button
+              onClick={() => setCurrentView('test')}
+              className={`text-sm rounded-lg border px-4 py-2 transition-colors ${
+                currentView === 'test'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white border-transparent hover:border-blue-600'
+              }`}
+            >
+              Test
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* View content */}
+      {currentView === 'test' ? (
+        <GameRendererTest />
+      ) : currentView === 'library' ? (
+        <GameLibrary />
+      ) : (
+        <>
+
       {!isInitialized ? (
         <div className="max-w-[500px] mx-auto p-10">
           <h2>Initialize AI Client</h2>
@@ -141,6 +238,8 @@ function App() {
         <div className="w-full px-5">
           <GameBuilder />
         </div>
+      )}
+        </>
       )}
     </main>
   )

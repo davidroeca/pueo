@@ -1,11 +1,13 @@
-import { useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { useChatStore, ChatMessage, GameTemplate } from '@/store/useChatStore'
-import { downloadGame, extractCodeFromMarkdown } from '@/utils/gameExport'
+import { useChatStore, ChatMessage } from '@/store/useChatStore'
 import { Markdown } from '@/components/Markdown'
-import { GamePreview } from '@/components/GamePreview'
+import { PhaserGameRenderer } from '@/components/PhaserGameRenderer'
 
 export function GameBuilder() {
+  const [showGameRenderer, setShowGameRenderer] = useState(false)
+  const [showNewGameNotification, setShowNewGameNotification] = useState(false)
+  const previousGameSpecRef = useRef<string | null>(null)
   const {
     messages,
     input,
@@ -13,34 +15,33 @@ export function GameBuilder() {
     streamingResponse,
     isStreaming,
     error,
-    sendStreamingMessage,
+    sendGameBuilderMessage,
     clearChat,
     setMessages,
-    templates,
-    setTemplates,
-    selectedTemplate,
-    setSelectedTemplate,
     systemPrompt,
     setSystemPrompt,
-    previewCode,
-    setPreviewCode,
+    generatedGameSpec,
+    activeToolCall,
   } = useChatStore()
 
-  // Load templates on mount
+  // Show notification when a new game spec is generated
   useEffect(() => {
-    invoke<[string, string, string][]>('get_game_template_list')
-      .then(setTemplates)
-      .catch(console.error)
-  }, [])
+    if (generatedGameSpec) {
+      const currentSpecId = generatedGameSpec.title
+      if (currentSpecId !== previousGameSpecRef.current) {
+        previousGameSpecRef.current = currentSpecId
+        setShowNewGameNotification(true)
 
-  const loadTemplate = async (key: string) => {
-    try {
-      const template = await invoke<GameTemplate>('get_game_template', { key })
-      setSelectedTemplate(template)
-    } catch (err) {
-      console.error('Failed to load template:', err)
+        // Auto-hide notification after 3 seconds
+        const timer = setTimeout(() => {
+          setShowNewGameNotification(false)
+        }, 3000)
+
+        return () => clearTimeout(timer)
+      }
     }
-  }
+  }, [generatedGameSpec])
+
 
   const handleSendMessage = async () => {
     let systemMessage: ChatMessage
@@ -66,41 +67,18 @@ export function GameBuilder() {
       setMessages([systemMessage, ...currentMessages])
     }
 
-    await sendStreamingMessage()
+    await sendGameBuilderMessage()
   }
 
-  const saveTemplate = () => {
-    if (!selectedTemplate) return
+  const saveGame = async () => {
+    if (!generatedGameSpec) return
 
-    const filename = `${selectedTemplate.name.toLowerCase().replace(/\s+/g, '-')}.html`
-    downloadGame(selectedTemplate.code, filename)
-  }
-
-  const previewGame = (code: string) => {
-    setPreviewCode(code)
-  }
-
-  const closePreview = () => {
-    setPreviewCode(null)
-  }
-
-  const previewLatestGame = () => {
-    // Find the last assistant message with code
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'assistant') {
-        const code = extractCodeFromMarkdown(messages[i].content)
-        if (code) {
-          previewGame(code)
-          return
-        }
-      }
-    }
-    // Also check streaming response
-    if (streamingResponse) {
-      const code = extractCodeFromMarkdown(streamingResponse)
-      if (code) {
-        previewGame(code)
-      }
+    try {
+      const gameId = await invoke<string>('save_game', { spec: generatedGameSpec })
+      alert(`Game saved successfully! ID: ${gameId}`)
+    } catch (err) {
+      alert(`Failed to save game: ${err}`)
+      console.error('Failed to save game:', err)
     }
   }
 
@@ -109,8 +87,19 @@ export function GameBuilder() {
       <div className="flex justify-left items-center mb-6">
         <h2 className="text-2xl font-bold">Game Builder Interface</h2>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
-        <div className="md:col-span-2">
+
+      {/* New game notification */}
+      {showNewGameNotification && (
+        <div className="fixed top-20 right-5 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">✓</span>
+            <span className="font-semibold">Game Ready!</span>
+          </div>
+          <div className="text-sm mt-1">Click "Play Game" to preview</div>
+        </div>
+      )}
+
+      <div className="max-w-4xl mx-auto">
           <h3 className="text-xl font-semibold mb-3">Chat</h3>
 
           <div className="min-h-[400px] max-h-[600px] text-left overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-5 mb-5 bg-white dark:bg-gray-900">
@@ -131,6 +120,20 @@ export function GameBuilder() {
                   <Markdown content={msg.content} />
                 </div>
               ))}
+
+            {activeToolCall && (
+              <div className="mb-4 p-2.5 rounded-md bg-purple-50 dark:bg-purple-900/30 mr-[10%] border-l-4 border-purple-500">
+                <div className="font-bold mb-1 text-purple-700 dark:text-purple-300">
+                  {activeToolCall.name === 'thinking' ? '💭 Thinking...' : '⚙️ Generating Game...'}
+                </div>
+                <div className="text-sm text-purple-600 dark:text-purple-400">
+                  {activeToolCall.name === 'thinking'
+                    ? 'Claude is reasoning about your request...'
+                    : 'Extracting game specification and creating playable game...'
+                  }
+                </div>
+              </div>
+            )}
 
             {streamingResponse && (
               <div className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[10%]">
@@ -168,13 +171,24 @@ export function GameBuilder() {
             >
               Send
             </button>
-            <button
-              type="button"
-              onClick={previewLatestGame}
-              className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-white bg-green-600 hover:bg-green-700 transition-colors shadow-sm cursor-pointer"
-            >
-              Preview
-            </button>
+            {generatedGameSpec && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowGameRenderer(true)}
+                  className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors shadow-sm cursor-pointer"
+                >
+                  Play Game
+                </button>
+                <button
+                  type="button"
+                  onClick={saveGame}
+                  className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
+                >
+                  Save Game
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={clearChat}
@@ -183,73 +197,14 @@ export function GameBuilder() {
               Clear
             </button>
           </form>
-        </div>
-
-        <div>
-          <h3 className="text-xl font-semibold mb-3">Templates</h3>
-
-          <div className="space-y-3">
-            {templates?.map(([key, name, description]) => (
-              <div
-                key={key}
-                className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-900"
-              >
-                <h4 className="font-semibold mb-1">{name}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  {description}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={async () => {
-                      const template = await invoke<GameTemplate>(
-                        'get_game_template',
-                        { key },
-                      )
-                      previewGame(template.code)
-                    }}
-                    className="text-sm rounded border border-transparent px-3 py-1.5 text-white bg-green-600 hover:bg-green-700 cursor-pointer"
-                  >
-                    Preview
-                  </button>
-                  <button
-                    onClick={() => loadTemplate(key)}
-                    className="text-sm rounded border border-transparent px-3 py-1.5 text-gray-900 bg-gray-100 dark:text-white dark:bg-gray-800 hover:border-blue-600 cursor-pointer"
-                  >
-                    View Code
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {selectedTemplate && (
-            <div className="mt-5 border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-900">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="font-semibold">{selectedTemplate.name}</h4>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => previewGame(selectedTemplate.code)}
-                    className="text-sm rounded border border-transparent px-3 py-1.5 text-white bg-green-600 hover:bg-green-700 cursor-pointer"
-                  >
-                    Preview
-                  </button>
-                  <button
-                    onClick={saveTemplate}
-                    className="text-sm rounded border border-transparent px-3 py-1.5 text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"
-                  >
-                    Download
-                  </button>
-                </div>
-              </div>
-              <pre className="text-xs overflow-auto max-h-[300px] bg-gray-100 dark:bg-gray-800 p-2 rounded">
-                <code>{selectedTemplate.code}</code>
-              </pre>
-            </div>
-          )}
-        </div>
       </div>
 
-      {previewCode && <GamePreview code={previewCode} onClose={closePreview} />}
+      {showGameRenderer && generatedGameSpec && (
+        <PhaserGameRenderer
+          spec={generatedGameSpec}
+          onClose={() => setShowGameRenderer(false)}
+        />
+      )}
     </div>
   )
 }
