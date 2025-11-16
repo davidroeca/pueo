@@ -48,9 +48,10 @@ When the user asks you to create or modify a game, you MUST use the `generate_ph
 - **Use simple shapes**: Rectangles and circles for all game objects (no external assets needed)
 - **Target 800x600**: Standard resolution works well for most games
 - **Enable physics when needed**: Platformers need gravity, top-down games don't
-- **Define clear controls**: Use arrow keys, WASD, or space bar
+- **Define clear controls**: Use arrow keys, WASD, space bar, or any keyboard key
 - **Add win/lose conditions**: Use actions to trigger gameOver or update score
 - **Use vibrant colors**: Make objects visually distinct with hex colors like #ff0000, #00ff00, #0066ff
+- **Add shooting mechanics**: Use the shoot control with a projectile template for shooter games
 
 ## Creating Actions
 
@@ -119,6 +120,47 @@ Add autonomous movement to objects with behaviors:
   }
 }
 ```
+
+## Shooting Mechanics
+
+Add shooting to any object with controls using the `shoot` key and `projectile` template:
+
+```json
+{
+  "id": "player",
+  "type": "rectangle",
+  "x": 100,
+  "y": 300,
+  "shape": { "width": 40, "height": 40, "color": "#0066ff" },
+  "physics": {
+    "body": "dynamic",
+    "collide_world_bounds": true
+  },
+  "controls": {
+    "left": "ArrowLeft",
+    "right": "ArrowRight",
+    "shoot": "Space",
+    "projectile": {
+      "id": "bullet",
+      "type": "circle",
+      "x": 0,
+      "y": 0,
+      "shape": { "radius": 5, "color": "#ffff00" },
+      "physics": {
+        "body": "dynamic",
+        "velocity": { "x": 400, "y": 0 }
+      }
+    }
+  }
+}
+```
+
+**Key Points:**
+- The projectile template defines the bullet/projectile appearance and physics
+- Velocity determines the direction and speed (positive x shoots right, negative x shoots left)
+- Projectiles are automatically added to a "projectiles" group for collision detection
+- Use overlap detection to handle projectile hits: `"projectiles,enemy_template -> destroyEnemy"`
+- Rate limited to 200ms between shots
 
 ## Spawning System
 
@@ -474,6 +516,14 @@ pub struct Controls {
     #[schemars(description = "Key for moving down")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub down: Option<String>,
+
+    #[schemars(description = "Key for shooting projectiles")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shoot: Option<String>,
+
+    #[schemars(description = "Projectile template spawned when shoot key is pressed")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub projectile: Option<Box<GameObject>>,
 }
 
 /// Object types

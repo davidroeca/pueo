@@ -21,6 +21,7 @@ interface ChatStore {
   isStreaming: boolean
   error: string
   model: string
+  activeToolCall: { name: string; timestamp: number } | null
 
   // Game Builder state
   systemPrompt: string
@@ -39,6 +40,7 @@ interface ChatStore {
   appendStreamingResponse: (chunk: string) => void
   setIsStreaming: (value: boolean) => void
   setError: (error: string) => void
+  setActiveToolCall: (toolCall: { name: string; timestamp: number } | null) => void
   addMessage: (message: ChatMessage) => void
   sendStreamingMessage: () => Promise<void>
   sendNonStreamingMessage: () => Promise<void>
@@ -62,6 +64,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isStreaming: false,
   error: '',
   model: 'claude-sonnet-4-5-20250929',
+  activeToolCall: null,
 
   // Game Builder initial state
   systemPrompt: '',
@@ -76,9 +79,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const { apiKey } = get()
     try {
       set({ initError: '' })
-      const result = await invoke<string>('init_ai', { apiKey })
+      await invoke<string>('init_ai', { apiKey })
       set({ isInitialized: true })
-      console.log(result)
     } catch (err) {
       set({ initError: String(err) })
     }
@@ -101,6 +103,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set((state) => ({ streamingResponse: state.streamingResponse + chunk })),
   setIsStreaming: (value) => set({ isStreaming: value }),
   setError: (error) => set({ error }),
+  setActiveToolCall: (toolCall) => set({ activeToolCall: toolCall }),
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
 

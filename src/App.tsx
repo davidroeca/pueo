@@ -24,6 +24,7 @@ function App() {
     addMessage,
     setError,
     setGeneratedGameSpec,
+    setActiveToolCall,
   } = useChatStore()
 
   // Check if AI is already initialized (from .env)
@@ -47,31 +48,38 @@ function App() {
         appendStreamingResponse(event.payload)
       })
 
+      // Listen for reasoning (Claude thinking)
+      const unlistenReasoning = await listen<string>('reasoning', (event) => {
+        // Show thinking indicator
+        setActiveToolCall({ name: 'thinking', timestamp: Date.now() })
+      })
+
+      // Listen for tool execution
+      const unlistenToolExecuting = await listen<string>('tool-executing', (event) => {
+        setActiveToolCall({ name: event.payload, timestamp: Date.now() })
+      })
+
+      // Listen for tool calls (from stream)
+      const unlistenToolCall = await listen<{ function: { name: string; arguments: unknown } }>(
+        'tool-call',
+        (event) => {
+          const toolCall = event.payload
+
+          if (toolCall.function.name === 'generate_phaser_game') {
+            const gameSpec = toolCall.function.arguments as PhaserGameSpec
+            setGeneratedGameSpec(gameSpec)
+          }
+
+          // Clear the tool execution indicator after successful extraction
+          setActiveToolCall(null)
+        }
+      )
+
       const unlistenFinalResponse = await listen<string>(
         'chat-final-response',
         (event) => {
-          // When we receive the final response, add it to messages immediately
+          // When we receive the final response, add it to messages
           const finalContent = event.payload
-
-          // Try to parse tool calls from the response
-          try {
-            const parsed = JSON.parse(finalContent)
-
-            // Check if there are tool uses
-            if (parsed.content && Array.isArray(parsed.content)) {
-              for (const item of parsed.content) {
-                if (item.type === 'tool_use' && item.name === 'generate_phaser_game') {
-                  // Extract the game spec from the tool call
-                  const gameSpec = item.input as PhaserGameSpec
-                  setGeneratedGameSpec(gameSpec)
-                  console.log('Game spec generated:', gameSpec)
-                }
-              }
-            }
-          } catch (e) {
-            // If parsing fails, it's probably just a text response
-            console.log('Not a tool call response:', e)
-          }
 
           addMessage({
             id: crypto.randomUUID(),
@@ -79,7 +87,8 @@ function App() {
             content: finalContent,
           })
           setStreamingResponse('')
-          setIsStreaming(false)
+          // Don't clear activeToolCall here - extraction is about to start
+          // It will be cleared when tool-call or chat-complete arrives
         },
       )
 
@@ -88,6 +97,7 @@ function App() {
         // Just ensure streaming state is cleaned up
         setIsStreaming(false)
         setStreamingResponse('')
+        setActiveToolCall(null)  // Clear any remaining tool indicators
       })
 
       // Listen for errors
@@ -95,13 +105,25 @@ function App() {
         setError(event.payload)
         setIsStreaming(false)
         setStreamingResponse('')
+        setActiveToolCall(null)  // Clear tool indicators on error
+      })
+
+      // Listen for extraction failures
+      const unlistenExtractionFailed = await listen<string>('extraction-failed', () => {
+        setActiveToolCall(null)  // Clear the "Generating Game..." indicator
+        // Note: We don't set this as an error since the conversation was successful,
+        // just no game was generated (e.g., user asked a question instead)
       })
 
       unlisten = [
         unlistenToken,
+        unlistenReasoning,
+        unlistenToolExecuting,
+        unlistenToolCall,
         unlistenFinalResponse,
         unlistenComplete,
         unlistenError,
+        unlistenExtractionFailed,
       ]
     }
 

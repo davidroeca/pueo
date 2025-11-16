@@ -2,6 +2,7 @@ use futures::StreamExt;
 use rig::agent::MultiTurnStreamItem;
 use rig::client::CompletionClient;
 use rig::completion::{Chat, Message, Prompt};
+use rig::extractor::ExtractorBuilder;
 use rig::providers::anthropic;
 use rig::streaming::{StreamedAssistantContent, StreamingChat, StreamingPrompt};
 use serde::{Deserialize, Serialize};
@@ -109,21 +110,59 @@ async fn stream_game_builder(
         agent.stream_chat(&last_user_message, history).await
     };
 
-    // Stream tokens to frontend
+    // Stream tokens to frontend and accumulate the full response
+    let mut accumulated_response = String::new();
+
     while let Some(result) = stream.next().await {
         match result {
             Ok(chunk) => match chunk {
-                MultiTurnStreamItem::StreamItem(item) => {
-                    if let StreamedAssistantContent::Text(text) = item {
+                MultiTurnStreamItem::StreamItem(item) => match item {
+                    StreamedAssistantContent::Text(text) => {
+                        accumulated_response.push_str(&text.text);
                         window
                             .emit("chat-token", &text.text)
                             .map_err(|e| format!("Failed to emit token: {}", e))?;
                     }
-                }
+                    _ => (),
+                },
                 MultiTurnStreamItem::FinalResponse(response) => {
+                    // Emit the final response first
                     window
                         .emit("chat-final-response", &response.response())
                         .map_err(|e| format!("Failed to emit final response: {}", e))?;
+
+                    // Show extraction indicator
+                    window
+                        .emit("tool-executing", "generate_phaser_game")
+                        .map_err(|e| format!("Failed to emit tool-executing: {}", e))?;
+
+                    // Try to extract game spec from the response text using the extractor
+                    let extractor = ExtractorBuilder::<_, game_builder::PhaserGameSpec>::new(
+                        client.completion_model(&model_name)
+                    )
+                    .preamble("Extract the game specification from the following text. If there's a complete game spec described, extract it.")
+                    .build();
+
+                    // Try to extract the game spec
+                    match extractor.extract(&accumulated_response).await {
+                        Ok(game_spec) => {
+                            // Emit the tool call with the extracted game spec
+                            window
+                                .emit("tool-call", serde_json::json!({
+                                    "function": {
+                                        "name": "generate_phaser_game",
+                                        "arguments": &game_spec
+                                    }
+                                }))
+                                .map_err(|e| format!("Failed to emit tool call: {}", e))?;
+                        }
+                        Err(e) => {
+                            // Emit extraction-failed event to clear the loading indicator
+                            window
+                                .emit("extraction-failed", format!("Could not extract game specification: {}", e))
+                                .map_err(|e| format!("Failed to emit extraction-failed: {}", e))?;
+                        }
+                    }
                 }
                 _ => (),
             },

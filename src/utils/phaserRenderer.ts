@@ -67,6 +67,8 @@ interface GameState {
   actions: Map<string, ActionDefinition>
   behaviorState: Map<string, BehaviorState>  // Separate state storage for behaviors
   objectBehaviors: Map<string, { behavior: BehaviorType; params?: Record<string, unknown> }>  // Track which objects have behaviors
+  projectileCounter: number  // Track projectile spawns
+  lastShootTime: Map<string, number>  // Track last shoot time per object (for rate limiting)
 }
 
 /**
@@ -85,6 +87,8 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       actions: new Map(),
       behaviorState: new Map(),
       objectBehaviors: new Map(),
+      projectileCounter: 0,
+      lastShootTime: new Map(),
     }
 
     constructor() {
@@ -110,6 +114,13 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       // Create all objects
       for (const objSpec of sceneSpec.objects) {
         this.createObject(objSpec)
+      }
+
+      // Pre-create projectiles group if any object has shooting controls
+      const hasShootControls = sceneSpec.objects.some((obj) => obj.controls?.shoot)
+      if (hasShootControls) {
+        const projectilesGroup = this.physics.add.group()
+        this.state.groups.set('projectiles', projectilesGroup)
       }
 
       // Set up custom logic
@@ -193,6 +204,10 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
               fontSize: objSpec.text.font_size || '32px',
               color: objSpec.text.fill || '#ffffff',
             })
+            // Set origin to center to match other game objects (except for UI text like scores)
+            if (objSpec.physics && objSpec.physics.body !== 'none') {
+              text.setOrigin(0.5, 0.5)
+            }
             gameObject = text
           }
           break
@@ -237,6 +252,13 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       // Apply physics properties (only works on dynamic bodies)
       if (hasArcadeBody(gameObject)) {
         const body = gameObject.body
+
+        // For text objects, set the body size to match the text display size
+        if (gameObject instanceof Phaser.GameObjects.Text) {
+          // Use display width/height instead of bounds
+          body.setSize(gameObject.displayWidth, gameObject.displayHeight)
+        }
+
         if (physics.bounce !== undefined) {
           body.setBounce(physics.bounce)
         }
@@ -409,7 +431,15 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
         }
       )
       gameOverText.setOrigin(0.5)
+
+      // Pause physics
       this.physics.pause()
+
+      // Stop all timers (including spawners)
+      for (const timer of this.state.timers) {
+        timer.remove()
+      }
+      this.state.timers = []
     }
 
     private parseAndSetupTimer(spec: string) {
@@ -600,6 +630,18 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
           }
           break
 
+        case 'text':
+          if (template.text) {
+            const text = this.add.text(position.x, position.y, template.text.text, {
+              fontSize: template.text.font_size || '32px',
+              color: template.text.fill || '#ffffff',
+            })
+            // Set origin to center to match other game objects
+            text.setOrigin(0.5, 0.5)
+            gameObject = text
+          }
+          break
+
         case 'sprite':
           if (template.texture) {
             const sprite = this.add.sprite(position.x, position.y, template.texture)
@@ -637,25 +679,28 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
         const leftKey = this.getKey(controls.left)
         const rightKey = this.getKey(controls.right)
 
+        // Reset horizontal velocity first
+        body.setVelocityX(0)
+
         if (leftKey?.isDown) {
           body.setVelocityX(-160)
-        } else if (rightKey?.isDown) {
+        }
+        if (rightKey?.isDown) {
           body.setVelocityX(160)
-        } else {
-          body.setVelocityX(0)
         }
       }
 
-      // Handle up/down
-      if (controls.up) {
+      // Handle up/down (continuous movement, not gravity-based)
+      if (controls.up || controls.down) {
         const upKey = this.getKey(controls.up)
+        const downKey = this.getKey(controls.down)
+
+        // Reset vertical velocity first (only if using up/down controls)
+        body.setVelocityY(0)
+
         if (upKey?.isDown) {
           body.setVelocityY(-160)
         }
-      }
-
-      if (controls.down) {
-        const downKey = this.getKey(controls.down)
         if (downKey?.isDown) {
           body.setVelocityY(160)
         }
@@ -666,6 +711,20 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
         const jumpKey = this.getKey(controls.jump)
         if (jumpKey?.isDown && body.touching.down) {
           body.setVelocityY(-330)
+        }
+      }
+
+      // Handle shooting
+      if (controls.shoot && controls.projectile) {
+        const shootKey = this.getKey(controls.shoot)
+
+        // Rate limiting: only shoot every 200ms
+        const now = this.time.now
+        const lastShot = this.state.lastShootTime.get(objSpec.id) || 0
+
+        if (shootKey?.isDown && now - lastShot > 200) {
+          this.spawnProjectile(objSpec, controls.projectile)
+          this.state.lastShootTime.set(objSpec.id, now)
         }
       }
     }
@@ -700,6 +759,54 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       }
 
       return this.state.customKeys.get(keyName)
+    }
+
+    private spawnProjectile(shooterSpec: GameObject, projectileTemplate: GameObject) {
+      const shooter = this.state.objects.get(shooterSpec.id)
+      if (!shooter || !hasBody(shooter)) return
+
+      // Create a unique ID for the projectile
+      const projectileId = `projectile_${this.state.projectileCounter++}`
+
+      // Determine spawn position (slightly offset from shooter)
+      const shooterBody = shooter.body
+      const spawnX = shooterBody.x
+      const spawnY = shooterBody.y
+
+      // Create the projectile using the template
+      const projectile = this.createSpawnedObject(projectileTemplate, { x: spawnX, y: spawnY })
+
+      if (projectile && hasArcadeBody(projectile)) {
+        // Store the projectile
+        this.state.objects.set(projectileId, projectile)
+
+        // Add to projectiles group (should already exist from create())
+        const projectilesGroup = this.state.groups.get('projectiles')
+        if (projectilesGroup) {
+          projectilesGroup.add(projectile)
+        }
+
+        // Fix: Adding to group sometimes resets velocity, so re-apply if needed
+        if (projectile.body.velocity.x === 0 && projectile.body.velocity.y === 0 && projectileTemplate.physics?.velocity) {
+          projectile.body.setVelocity(projectileTemplate.physics.velocity.x, projectileTemplate.physics.velocity.y)
+        }
+
+        // Auto-destroy projectile when it leaves the world bounds
+        projectile.body.world.on('worldbounds', (body: Phaser.Physics.Arcade.Body) => {
+          if (body.gameObject === projectile) {
+            projectile.destroy()
+          }
+        })
+        projectile.body.setCollideWorldBounds(false)
+
+        // Clean up when destroyed
+        projectile.once('destroy', () => {
+          this.state.objects.delete(projectileId)
+          if (projectilesGroup) {
+            projectilesGroup.remove(projectile)
+          }
+        })
+      }
     }
 
     private handleBehavior(objSpec: GameObject) {

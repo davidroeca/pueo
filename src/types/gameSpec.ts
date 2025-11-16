@@ -56,6 +56,8 @@ export interface Controls {
   jump?: string
   up?: string
   down?: string
+  shoot?: string
+  projectile?: GameObject
 }
 
 export type ObjectType = 'sprite' | 'rectangle' | 'circle' | 'text' | 'group'

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useChatStore, ChatMessage } from '@/store/useChatStore'
 import { Markdown } from '@/components/Markdown'
@@ -6,6 +6,8 @@ import { PhaserGameRenderer } from '@/components/PhaserGameRenderer'
 
 export function GameBuilder() {
   const [showGameRenderer, setShowGameRenderer] = useState(false)
+  const [showNewGameNotification, setShowNewGameNotification] = useState(false)
+  const previousGameSpecRef = useRef<string | null>(null)
   const {
     messages,
     input,
@@ -19,7 +21,26 @@ export function GameBuilder() {
     systemPrompt,
     setSystemPrompt,
     generatedGameSpec,
+    activeToolCall,
   } = useChatStore()
+
+  // Show notification when a new game spec is generated
+  useEffect(() => {
+    if (generatedGameSpec) {
+      const currentSpecId = generatedGameSpec.title
+      if (currentSpecId !== previousGameSpecRef.current) {
+        previousGameSpecRef.current = currentSpecId
+        setShowNewGameNotification(true)
+
+        // Auto-hide notification after 3 seconds
+        const timer = setTimeout(() => {
+          setShowNewGameNotification(false)
+        }, 3000)
+
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [generatedGameSpec])
 
 
   const handleSendMessage = async () => {
@@ -66,6 +87,18 @@ export function GameBuilder() {
       <div className="flex justify-left items-center mb-6">
         <h2 className="text-2xl font-bold">Game Builder Interface</h2>
       </div>
+
+      {/* New game notification */}
+      {showNewGameNotification && (
+        <div className="fixed top-20 right-5 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">✓</span>
+            <span className="font-semibold">Game Ready!</span>
+          </div>
+          <div className="text-sm mt-1">Click "Play Game" to preview</div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto">
           <h3 className="text-xl font-semibold mb-3">Chat</h3>
 
@@ -87,6 +120,20 @@ export function GameBuilder() {
                   <Markdown content={msg.content} />
                 </div>
               ))}
+
+            {activeToolCall && (
+              <div className="mb-4 p-2.5 rounded-md bg-purple-50 dark:bg-purple-900/30 mr-[10%] border-l-4 border-purple-500">
+                <div className="font-bold mb-1 text-purple-700 dark:text-purple-300">
+                  {activeToolCall.name === 'thinking' ? '💭 Thinking...' : '⚙️ Generating Game...'}
+                </div>
+                <div className="text-sm text-purple-600 dark:text-purple-400">
+                  {activeToolCall.name === 'thinking'
+                    ? 'Claude is reasoning about your request...'
+                    : 'Extracting game specification and creating playable game...'
+                  }
+                </div>
+              </div>
+            )}
 
             {streamingResponse && (
               <div className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[10%]">
