@@ -2,11 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { useChatStore } from '@/store/useChatStore'
 import { GameBuilder } from '@/components/GameBuilder'
+import { GameLibrary } from '@/components/GameLibrary'
 import { GameRendererTest } from '@/components/GameRendererTest'
 import { Logo } from '@/components/Logo'
+import type { PhaserGameSpec } from '@/types/gameSpec'
+
+type View = 'chat' | 'library' | 'test'
 
 function App() {
-  const [showTest, setShowTest] = useState(false)
+  const [currentView, setCurrentView] = useState<View>('chat')
   const {
     apiKey,
     setApiKey,
@@ -19,6 +23,7 @@ function App() {
     setIsStreaming,
     addMessage,
     setError,
+    setGeneratedGameSpec,
   } = useChatStore()
 
   // Check if AI is already initialized (from .env)
@@ -47,6 +52,27 @@ function App() {
         (event) => {
           // When we receive the final response, add it to messages immediately
           const finalContent = event.payload
+
+          // Try to parse tool calls from the response
+          try {
+            const parsed = JSON.parse(finalContent)
+
+            // Check if there are tool uses
+            if (parsed.content && Array.isArray(parsed.content)) {
+              for (const item of parsed.content) {
+                if (item.type === 'tool_use' && item.name === 'generate_phaser_game') {
+                  // Extract the game spec from the tool call
+                  const gameSpec = item.input as PhaserGameSpec
+                  setGeneratedGameSpec(gameSpec)
+                  console.log('Game spec generated:', gameSpec)
+                }
+              }
+            }
+          } catch (e) {
+            // If parsing fails, it's probably just a text response
+            console.log('Not a tool call response:', e)
+          }
+
           addMessage({
             id: crypto.randomUUID(),
             role: 'assistant',
@@ -96,18 +122,54 @@ function App() {
 
   return (
     <main className="m-0 pt-[5vh] flex flex-col justify-center text-center">
-      <div className="flex flex-row justify-center gap-3 items-center">
-        <Logo className="h-[80px] w-[80px]" />
-        <h1 className="text-center text-4xl font-bold">Pueo</h1>
-        <button
-          onClick={() => setShowTest(!showTest)}
-          className="ml-4 text-sm rounded-lg border border-transparent px-3 py-2 text-gray-900 bg-gray-200 dark:text-white dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-        >
-          {showTest ? 'Back to Chat' : 'Test Renderer'}
-        </button>
+      <div className="flex flex-col gap-4 items-center mb-6">
+        <div className="flex flex-row gap-3 items-center">
+          <Logo className="h-[80px] w-[80px]" />
+          <h1 className="text-center text-4xl font-bold">Pueo</h1>
+        </div>
+
+        {/* Navigation tabs */}
+        {isInitialized && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentView('chat')}
+              className={`text-sm rounded-lg border px-4 py-2 transition-colors ${
+                currentView === 'chat'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white border-transparent hover:border-blue-600'
+              }`}
+            >
+              Game Builder
+            </button>
+            <button
+              onClick={() => setCurrentView('library')}
+              className={`text-sm rounded-lg border px-4 py-2 transition-colors ${
+                currentView === 'library'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white border-transparent hover:border-blue-600'
+              }`}
+            >
+              Library
+            </button>
+            <button
+              onClick={() => setCurrentView('test')}
+              className={`text-sm rounded-lg border px-4 py-2 transition-colors ${
+                currentView === 'test'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white border-transparent hover:border-blue-600'
+              }`}
+            >
+              Test
+            </button>
+          </div>
+        )}
       </div>
-      {showTest ? (
+
+      {/* View content */}
+      {currentView === 'test' ? (
         <GameRendererTest />
+      ) : currentView === 'library' ? (
+        <GameLibrary />
       ) : (
         <>
 

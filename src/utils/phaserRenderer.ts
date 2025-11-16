@@ -7,7 +7,37 @@ import type {
   Spawner,
   ActionDefinition,
   ActionEffect,
+  BehaviorType,
 } from '@/types/gameSpec'
+
+/**
+ * Behavior state storage for patrol, follow, random behaviors
+ */
+interface BehaviorState {
+  patrolStart?: number
+  lastDirectionChange?: number
+}
+
+/**
+ * Extended GameObject that may have physics
+ */
+interface GameObjectWithPhysics extends Phaser.GameObjects.GameObject {
+  body: Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody
+}
+
+/**
+ * Type guard to check if object has physics body
+ */
+function hasBody(obj: Phaser.GameObjects.GameObject): obj is GameObjectWithPhysics {
+  return 'body' in obj && obj.body !== undefined && obj.body !== null
+}
+
+/**
+ * Type guard to check if object has an Arcade body (not static)
+ */
+function hasArcadeBody(obj: Phaser.GameObjects.GameObject): obj is GameObjectWithPhysics & { body: Phaser.Physics.Arcade.Body } {
+  return hasBody(obj) && obj.body instanceof Phaser.Physics.Arcade.Body
+}
 
 /**
  * Parse hex color string to number for Phaser
@@ -35,6 +65,8 @@ interface GameState {
   spawnCounters: Map<string, number>
   score: number
   actions: Map<string, ActionDefinition>
+  behaviorState: Map<string, BehaviorState>  // Separate state storage for behaviors
+  objectBehaviors: Map<string, { behavior: BehaviorType; params?: Record<string, unknown> }>  // Track which objects have behaviors
 }
 
 /**
@@ -51,6 +83,8 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       spawnCounters: new Map(),
       score: 0,
       actions: new Map(),
+      behaviorState: new Map(),
+      objectBehaviors: new Map(),
     }
 
     constructor() {
@@ -106,24 +140,19 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       }
 
       // Handle behaviors for spawned objects
-      for (const [_id, obj] of this.state.objects) {
-        if ((obj as any).behavior) {
-          const behavior = (obj as any).behavior
-          const params = (obj as any).behavior_params
-          const body = (obj as any).body
-
-          if (body) {
-            switch (behavior) {
-              case 'patrol':
-                this.handlePatrolBehavior(obj, body, params)
-                break
-              case 'follow':
-                this.handleFollowBehavior(obj, body, params)
-                break
-              case 'random':
-                this.handleRandomBehavior(obj, body, params)
-                break
-            }
+      for (const [id, behaviorInfo] of this.state.objectBehaviors) {
+        const obj = this.state.objects.get(id)
+        if (obj && hasArcadeBody(obj)) {
+          switch (behaviorInfo.behavior) {
+            case 'patrol':
+              this.handlePatrolBehavior(id, obj, obj.body, behaviorInfo.params)
+              break
+            case 'follow':
+              this.handleFollowBehavior(id, obj, obj.body, behaviorInfo.params)
+              break
+            case 'random':
+              this.handleRandomBehavior(id, obj.body, behaviorInfo.params)
+              break
           }
         }
       }
@@ -205,8 +234,9 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       const isStatic = physics.body === 'static'
       this.physics.add.existing(gameObject, isStatic)
 
-      const body = (gameObject as any).body as Phaser.Physics.Arcade.Body
-      if (body) {
+      // Apply physics properties (only works on dynamic bodies)
+      if (hasArcadeBody(gameObject)) {
+        const body = gameObject.body
         if (physics.bounce !== undefined) {
           body.setBounce(physics.bounce)
         }
@@ -290,11 +320,21 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
     }
 
     private createInteractionHandler(callback: string) {
-      return (_obj1: any, obj2: any) => {
+      return (
+        _obj1: Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody | Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
+        obj2: Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody | Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
+      ) => {
         // First check if it's a registered action
         const action = this.state.actions.get(callback)
         if (action) {
-          this.executeAction(action.effect, obj2)
+          // Extract GameObject from the various types
+          let gameObj: Phaser.GameObjects.GameObject | undefined
+          if ('gameObject' in obj2) {
+            gameObj = obj2.gameObject as Phaser.GameObjects.GameObject
+          } else if (obj2 instanceof Phaser.GameObjects.GameObject) {
+            gameObj = obj2
+          }
+          this.executeAction(action.effect, gameObj)
           return
         }
 
@@ -307,7 +347,16 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
             this.handleGameOver()
             break
           case 'destroy':
-            obj2.destroy()
+            // Extract GameObject and destroy it
+            let gameObj: Phaser.GameObjects.GameObject | undefined
+            if ('gameObject' in obj2) {
+              gameObj = obj2.gameObject as Phaser.GameObjects.GameObject
+            } else if (obj2 instanceof Phaser.GameObjects.GameObject) {
+              gameObj = obj2
+            }
+            if (gameObj) {
+              gameObj.destroy()
+            }
             break
           default:
             console.warn(`Unknown callback: ${callback}`)
@@ -315,7 +364,7 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       }
     }
 
-    private executeAction(effect: ActionEffect, targetObj?: any) {
+    private executeAction(effect: ActionEffect, targetObj?: Phaser.GameObjects.GameObject) {
       switch (effect.type) {
         case 'updateScore':
           this.state.score += effect.points
@@ -438,6 +487,14 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
         const uniqueId = `${spawner.id}_spawned_${currentCount}`
         this.state.objects.set(uniqueId, spawnedObj)
 
+        // Register behavior if template has one
+        if (spawner.template.behavior) {
+          this.state.objectBehaviors.set(uniqueId, {
+            behavior: spawner.template.behavior,
+            params: spawner.template.behavior_params,
+          })
+        }
+
         // Add to the group for this template
         const templateId = spawner.template.id
         const group = this.state.groups.get(templateId)
@@ -451,6 +508,8 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
         // Clean up when object is destroyed
         spawnedObj.once('destroy', () => {
           this.state.objects.delete(uniqueId)
+          this.state.objectBehaviors.delete(uniqueId)
+          this.state.behaviorState.delete(uniqueId)
           // Also remove from group
           if (group) {
             group.remove(spawnedObj)
@@ -558,11 +617,8 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
         this.applyPhysics(gameObject, template.physics)
       }
 
-      // Apply behavior from template
-      if (template.behavior) {
-        ;(gameObject as any).behavior = template.behavior
-        ;(gameObject as any).behavior_params = template.behavior_params
-      }
+      // Note: Behavior state is managed separately in this.state.behaviorState
+      // and initialized when the behavior handler is first called
 
       return gameObject
     }
@@ -571,9 +627,9 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       if (!objSpec.controls) return
 
       const obj = this.state.objects.get(objSpec.id)
-      if (!obj || !(obj as any).body) return
+      if (!obj || !hasArcadeBody(obj)) return
 
-      const body = (obj as any).body as Phaser.Physics.Arcade.Body
+      const body = obj.body
       const controls = objSpec.controls
 
       // Handle left/right
@@ -650,38 +706,44 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       if (!objSpec.behavior) return
 
       const obj = this.state.objects.get(objSpec.id)
-      if (!obj || !(obj as any).body) return
-
-      const body = (obj as any).body as Phaser.Physics.Arcade.Body
+      if (!obj || !hasArcadeBody(obj)) return
 
       switch (objSpec.behavior) {
         case 'patrol':
-          this.handlePatrolBehavior(obj, body, objSpec.behavior_params)
+          this.handlePatrolBehavior(objSpec.id, obj, obj.body, objSpec.behavior_params)
           break
         case 'follow':
-          this.handleFollowBehavior(obj, body, objSpec.behavior_params)
+          this.handleFollowBehavior(objSpec.id, obj, obj.body, objSpec.behavior_params)
           break
         case 'random':
-          this.handleRandomBehavior(obj, body, objSpec.behavior_params)
+          this.handleRandomBehavior(objSpec.id, obj.body, objSpec.behavior_params)
           break
       }
     }
 
     private handlePatrolBehavior(
-      obj: Phaser.GameObjects.GameObject,
+      id: string,
+      _obj: GameObjectWithPhysics,
       body: Phaser.Physics.Arcade.Body,
-      params: any
+      params: Record<string, unknown> | undefined
     ) {
       // Simple patrol: move back and forth
-      const range = params?.range || 200
-      const speed = params?.speed || 50
+      const range = (params?.range as number) || 200
+      const speed = (params?.speed as number) || 50
 
-      // Store initial position if not set
-      if (!(obj as any).patrolStart) {
-        ;(obj as any).patrolStart = body.x
+      // Get or initialize behavior state
+      let state = this.state.behaviorState.get(id)
+      if (!state) {
+        state = { patrolStart: body.x }
+        this.state.behaviorState.set(id, state)
       }
 
-      const start = (obj as any).patrolStart
+      // Store initial position if not set
+      if (state.patrolStart === undefined) {
+        state.patrolStart = body.x
+      }
+
+      const start = state.patrolStart
       const distance = Math.abs(body.x - start)
 
       if (distance >= range) {
@@ -694,47 +756,52 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
     }
 
     private handleFollowBehavior(
-      _obj: Phaser.GameObjects.GameObject,
+      _id: string,
+      _obj: GameObjectWithPhysics,
       body: Phaser.Physics.Arcade.Body,
-      params: any
+      params: Record<string, unknown> | undefined
     ) {
-      const targetId = params?.target || 'player'
+      const targetId = (params?.target as string) || 'player'
       const target = this.state.objects.get(targetId)
 
-      if (!target) return
+      if (!target || !hasBody(target)) return
 
-      const targetBody = (target as any).body
-      if (!targetBody) return
-
-      const speed = params?.speed || 80
+      const speed = (params?.speed as number) || 80
       const angle = Phaser.Math.Angle.Between(
         body.x,
         body.y,
-        targetBody.x,
-        targetBody.y
+        target.body.x,
+        target.body.y
       )
 
       body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed)
     }
 
     private handleRandomBehavior(
-      _obj: Phaser.GameObjects.GameObject,
+      id: string,
       body: Phaser.Physics.Arcade.Body,
-      params: any
+      params: Record<string, unknown> | undefined
     ) {
-      const speed = params?.speed || 100
-      const interval = params?.interval || 1000
+      const speed = (params?.speed as number) || 100
+      const interval = (params?.interval as number) || 1000
+
+      // Get or initialize behavior state
+      let state = this.state.behaviorState.get(id)
+      if (!state) {
+        state = { lastDirectionChange: 0 }
+        this.state.behaviorState.set(id, state)
+      }
 
       // Change direction at random intervals
-      if (!(body as any).lastDirectionChange) {
-        ;(body as any).lastDirectionChange = 0
+      if (state.lastDirectionChange === undefined) {
+        state.lastDirectionChange = 0
       }
 
       const now = this.time.now
-      if (now - (body as any).lastDirectionChange > interval) {
+      if (now - state.lastDirectionChange > interval) {
         const angle = Phaser.Math.FloatBetween(0, Math.PI * 2)
         body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed)
-        ;(body as any).lastDirectionChange = now
+        state.lastDirectionChange = now
       }
     }
   }
