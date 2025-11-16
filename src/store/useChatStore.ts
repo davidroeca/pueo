@@ -8,12 +8,6 @@ export interface ChatMessage {
   content: string
 }
 
-export interface GameTemplate {
-  name: string
-  description: string
-  code: string
-}
-
 interface ChatStore {
   // AI Initialization state
   apiKey: string
@@ -29,10 +23,7 @@ interface ChatStore {
   model: string
 
   // Game Builder state
-  templates: [string, string, string][] | null
-  selectedTemplate: GameTemplate | null
   systemPrompt: string
-  previewCode: string | null
   generatedGameSpec: PhaserGameSpec | null
 
   // AI Initialization actions
@@ -56,10 +47,7 @@ interface ChatStore {
   checkInitialization: () => Promise<void>
 
   // Game Builder actions
-  setTemplates: (templates: [string, string, string][] | null) => void
-  setSelectedTemplate: (template: GameTemplate | null) => void
   setSystemPrompt: (prompt: string) => void
-  setPreviewCode: (code: string | null) => void
   setGeneratedGameSpec: (spec: PhaserGameSpec | null) => void
 }
 
@@ -76,10 +64,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   model: 'claude-sonnet-4-5-20250929',
 
   // Game Builder initial state
-  templates: null,
-  selectedTemplate: null,
   systemPrompt: '',
-  previewCode: null,
   generatedGameSpec: null,
 
   // AI Initialization actions
@@ -206,9 +191,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     }),
 
   // Game Builder actions
-  setTemplates: (templates) => set({ templates }),
-  setSelectedTemplate: (template) => set({ selectedTemplate: template }),
   setSystemPrompt: (prompt) => set({ systemPrompt: prompt }),
-  setPreviewCode: (code) => set({ previewCode: code }),
   setGeneratedGameSpec: (spec) => set({ generatedGameSpec: spec }),
 }))
