@@ -82,10 +82,10 @@ flowchart TD
     B -->|Tool Call| C[Structured JSON<br/>PhaserGameSpec]
     C --> D[Phaser Renderer<br/>Playable Game]
 
-    style A fill:#e1f5ff
-    style B fill:#fff4e1
-    style C fill:#f0e1ff
-    style D fill:#e1ffe1
+    style A fill:#4a9eff,stroke:#2563eb,color:#000
+    style B fill:#f59e0b,stroke:#d97706,color:#000
+    style C fill:#a78bfa,stroke:#7c3aed,color:#000
+    style D fill:#34d399,stroke:#059669,color:#000
 ```
 
 ### Database Structure
