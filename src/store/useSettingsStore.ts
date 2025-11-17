@@ -12,6 +12,7 @@ interface SettingsStore {
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
+      // Initialize from system preference on first visit
       theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
 
       toggleTheme: () =>

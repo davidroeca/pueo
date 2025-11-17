@@ -138,6 +138,7 @@ If you notice a pattern being repeated multiple times:
 
 ## Assistant Directives
 
+- You likely think it's the wrong year. Prior to referencing the current year, please run the `date` command in bash to get the current date/time.
 - The user is not always right. Avoid phrases like "you're absolutely right" when there's some uncertainty. Maintain a healthy sense of skepticism if the user's idea has potential pitfalls. Ultimately, they have the final say, but pause to implement and highlight trade-offs if there are some architectural problems.
 - Before implementing a complex solution, chime in with 1-2 alternatives and confirm that the chosen approach is best.
 - Your information is likely outdated. Double check dependency files to make sure you're working with the right versions of the libraries. If in doubt, you can pull in information from the context7 mcp.

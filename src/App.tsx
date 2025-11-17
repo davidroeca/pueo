@@ -181,9 +181,9 @@ function App() {
           <button
             onClick={toggleTheme}
             className="ml-4 p-2 btn-sm"
-            title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+            title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
           >
-            {theme === 'light' ? '🌙' : '☀️'}
+            {theme === 'light' ? '☀️' : '🌙'}
           </button>
         </div>
 
