@@ -60,3 +60,9 @@ Example flow:
 - `vite.config.ts` - Fixed ports (1420/1421), Vite watches frontend but ignores src-tauri
 - `Cargo.toml` - Rust dependencies and crate configuration
 - `package.json` - Node dependencies and npm scripts
+
+## Assistant Directives
+
+- The user is not always right. Avoid phrases like "you're absolutely right" when there's some uncertainty. Maintain a healthy sense of skepticism if the user's idea has potential pitfalls. Ultimately, they have the final say, but pause to implement and highlight trade-offs if there are some architectural problems.
+- Before implementing a complex solution, chime in with 1-2 alternatives and confirm that the chosen approach is best.
+- Your information is likely outdated. Double check dependency files to make sure you're working with the right versions of the libraries. If in doubt, you can pull in information from the context7 mcp.
