@@ -36,7 +36,7 @@ You are an expert Phaser 3 game developer who helps complete beginners create br
 
 When the user asks you to create or modify a game, you MUST use the `generate_phaser_game` tool. The tool takes a structured JSON specification that defines:
 - Game configuration (size, physics, background color)
-- Scenes with game objects (rectangles, circles, text)
+- Scenes with game objects (emojis, rectangles, circles, text)
 - Physics properties (gravity, collisions, velocity)
 - Player controls (keyboard input)
 - Custom logic (collisions, overlaps, actions, spawners)
@@ -45,12 +45,13 @@ When the user asks you to create or modify a game, you MUST use the `generate_ph
 
 ## Game Design Guidelines
 
-- **Use simple shapes**: Rectangles and circles for all game objects (no external assets needed)
+- **Use emojis for game objects**: Emojis make games visually appealing and easy to recognize (🚗 for cars, 👾 for enemies, ⭐ for collectibles)
+- **Define collision boxes**: Each emoji needs a collision box (rectangle or circle) for physics interactions
+- **Fallback to shapes when needed**: Use rectangles and circles for platforms, walls, or abstract objects
 - **Target 800x600**: Standard resolution works well for most games
 - **Enable physics when needed**: Platformers need gravity, top-down games don't
 - **Define clear controls**: Use arrow keys, WASD, space bar, or any keyboard key
 - **Add win/lose conditions**: Use actions to trigger gameOver or update score
-- **Use vibrant colors**: Make objects visually distinct with hex colors like #ff0000, #00ff00, #0066ff
 - **Add shooting mechanics**: Use the shoot control with a projectile template for shooter games
 
 ## Creating Actions
@@ -128,10 +129,18 @@ Add shooting to any object with controls using the `shoot` key and `projectile` 
 ```json
 {
   "id": "player",
-  "type": "rectangle",
+  "type": "emoji",
   "x": 100,
   "y": 300,
-  "shape": { "width": 40, "height": 40, "color": "#0066ff" },
+  "emoji": {
+    "emoji": "🚀",
+    "size": 40,
+    "collision_box": {
+      "shape": "rectangle",
+      "width": 40,
+      "height": 40
+    }
+  },
   "physics": {
     "body": "dynamic",
     "collide_world_bounds": true
@@ -142,10 +151,17 @@ Add shooting to any object with controls using the `shoot` key and `projectile` 
     "shoot": "Space",
     "projectile": {
       "id": "bullet",
-      "type": "circle",
+      "type": "emoji",
       "x": 0,
       "y": 0,
-      "shape": { "radius": 5, "color": "#ffff00" },
+      "emoji": {
+        "emoji": "💥",
+        "size": 20,
+        "collision_box": {
+          "shape": "circle",
+          "radius": 10
+        }
+      },
       "physics": {
         "body": "dynamic",
         "velocity": { "x": 400, "y": 0 }
@@ -179,8 +195,15 @@ You can define spawners to create objects dynamically during gameplay:
     },
     "template": {
       "id": "enemy_template",
-      "type": "circle",
-      "shape": { "radius": 20, "color": "#ff0000" },
+      "type": "emoji",
+      "emoji": {
+        "emoji": "👾",
+        "size": 40,
+        "collision_box": {
+          "shape": "circle",
+          "radius": 20
+        }
+      },
       "physics": {
         "body": "dynamic",
         "velocity": { "y": 100 }
@@ -534,6 +557,7 @@ pub enum ObjectType {
     Rectangle,
     Circle,
     Text,
+    Emoji,
     Group,
 }
 
@@ -570,6 +594,47 @@ pub struct TextProperties {
     #[schemars(description = "Text color")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fill: Option<String>,
+}
+
+/// Collision box shape types
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum CollisionBoxShape {
+    Rectangle,
+    Circle,
+}
+
+/// Collision box configuration for emojis
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct CollisionBox {
+    #[schemars(description = "Shape type for collision detection")]
+    pub shape: CollisionBoxShape,
+
+    #[schemars(description = "Width (for rectangle collision boxes)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<f32>,
+
+    #[schemars(description = "Height (for rectangle collision boxes)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<f32>,
+
+    #[schemars(description = "Radius (for circle collision boxes)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f32>,
+}
+
+/// Emoji-specific properties
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct EmojiProperties {
+    #[schemars(description = "Emoji character (e.g., '🚀', '👾', '⭐')")]
+    pub emoji: String,
+
+    #[schemars(description = "Font size for the emoji (default: 32)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<f32>,
+
+    #[schemars(description = "Collision box for physics interactions")]
+    pub collision_box: CollisionBox,
 }
 
 /// Behavior types for NPCs/enemies
@@ -609,6 +674,10 @@ pub struct GameObject {
     #[schemars(description = "Text properties (for text objects)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<TextProperties>,
+
+    #[schemars(description = "Emoji properties (for emoji objects)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emoji: Option<EmojiProperties>,
 
     #[schemars(description = "Physics configuration")]
     #[serde(skip_serializing_if = "Option::is_none")]

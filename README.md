@@ -7,6 +7,7 @@ Named after the owl endemic to Hawaii, Pueo is an AI-powered game builder that h
 ## Features
 
 - Describe your game idea in natural language and Claude generates it using structured JSON.
+- Games use expressive emojis (🚀, 👾, ⭐) for characters and objects with precise physics-based collision detection.
 - Games render in real-time using the Phaser 3 game engine.
 - Browse, search, play, and manage your saved games in a built-in library.
 - Claude uses tool calling to create precise, validated game specifications.
@@ -143,9 +144,17 @@ Pueo supports rich game specifications with the following features:
 
 ### Game Objects
 
-- **Shapes**: Rectangles, Circles
-- **Text**: Dynamic text with font/color options
+- **Emojis** (🚀, 👾, ⭐): Unicode characters with custom collision boxes - **primary choice for visual game objects**
+- **Rectangles**: Geometric shapes for platforms, walls, bullets
+- **Circles**: Geometric shapes for simple objects
+- **Text**: Dynamic text with font/color options for UI elements
 - **Sprites**: Image-based objects (requires assets)
+
+**Emoji Objects:**
+Emojis combine visual appeal with physics-based collision detection:
+- Visual: Rendered as Unicode text at specified size
+- Collision: Separate rectangle or circle collision box for physics
+- This hybrid approach is standard in game development (same as sprites)
 
 ### Physics
 
@@ -198,28 +207,58 @@ Pueo supports rich game specifications with the following features:
     "objects": [
       {
         "id": "player",
-        "type": "rectangle",
+        "type": "emoji",
         "x": 100,
         "y": 450,
-        "shape": { "width": 32, "height": 48, "color": "#ff0000" },
+        "emoji": {
+          "emoji": "🏃",
+          "size": 48,
+          "collision_box": {
+            "shape": "rectangle",
+            "width": 32,
+            "height": 48
+          }
+        },
         "physics": { "body": "dynamic", "collide_world_bounds": true },
         "controls": {
-          "left": "left",
-          "right": "right",
-          "jump": "up"
+          "left": "ArrowLeft",
+          "right": "ArrowRight",
+          "jump": "ArrowUp"
         }
+      },
+      {
+        "id": "star",
+        "type": "emoji",
+        "x": 600,
+        "y": 200,
+        "emoji": {
+          "emoji": "⭐",
+          "size": 32,
+          "collision_box": {
+            "shape": "circle",
+            "radius": 16
+          }
+        },
+        "physics": { "body": "dynamic", "bounce": 0.8 }
       },
       {
         "id": "ground",
         "type": "rectangle",
         "x": 400,
         "y": 568,
-        "shape": { "width": 800, "height": 64, "color": "#00ff00" },
+        "shape": { "width": 800, "height": 64, "color": "#00aa00" },
         "physics": { "body": "static" }
       }
     ],
     "custom_logic": {
-      "on_collision": ["player,ground -> null"]
+      "on_collision": ["player,ground -> null", "star,ground -> null"],
+      "on_overlap": ["player,star -> collectStar"],
+      "actions": [
+        {
+          "name": "collectStar",
+          "effect": { "type": "updateScore", "points": 10 }
+        }
+      ]
     }
   }]
 }

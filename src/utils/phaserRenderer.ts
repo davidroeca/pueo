@@ -212,6 +212,18 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
           }
           break
 
+        case 'emoji':
+          if (objSpec.emoji) {
+            const emoji = this.add.text(objSpec.x, objSpec.y, objSpec.emoji.emoji, {
+              fontSize: `${objSpec.emoji.size || 32}px`,
+              color: '#ffffff',
+            })
+            // Center the emoji
+            emoji.setOrigin(0.5, 0.5)
+            gameObject = emoji
+          }
+          break
+
         case 'sprite':
           if (objSpec.texture) {
             const sprite = this.add.sprite(objSpec.x, objSpec.y, objSpec.texture)
@@ -236,13 +248,14 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
 
       // Apply physics if specified
       if (objSpec.physics && gameObject) {
-        this.applyPhysics(gameObject, objSpec.physics)
+        this.applyPhysics(gameObject, objSpec.physics, objSpec)
       }
     }
 
     private applyPhysics(
       gameObject: Phaser.GameObjects.GameObject,
-      physics: GameObject['physics']
+      physics: GameObject['physics'],
+      objSpec?: GameObject
     ) {
       if (!physics || physics.body === 'none') return
 
@@ -253,8 +266,47 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       if (hasArcadeBody(gameObject)) {
         const body = gameObject.body
 
+        // For emoji objects, use the collision box to set physics body size
+        if (objSpec?.type === 'emoji' && objSpec.emoji?.collision_box) {
+          const collisionBox = objSpec.emoji.collision_box
+          if (collisionBox.shape === 'rectangle' && collisionBox.width && collisionBox.height) {
+            // For text objects with centered origin, we need to ensure the body is properly positioned
+            if (gameObject instanceof Phaser.GameObjects.Text) {
+              // First, get the text bounds
+              const textWidth = gameObject.width
+              const textHeight = gameObject.height
+
+              // Set the body size
+              body.setSize(collisionBox.width, collisionBox.height)
+
+              // Center the body relative to the text bounds
+              const offsetX = (textWidth - collisionBox.width) / 2
+              const offsetY = (textHeight - collisionBox.height) / 2
+              body.setOffset(offsetX, offsetY)
+            } else {
+              body.setSize(collisionBox.width, collisionBox.height)
+            }
+          } else if (collisionBox.shape === 'circle' && collisionBox.radius) {
+            if (gameObject instanceof Phaser.GameObjects.Text) {
+              // First, get the text bounds
+              const textWidth = gameObject.width
+              const textHeight = gameObject.height
+
+              // Set circular body
+              body.setCircle(collisionBox.radius)
+
+              // Center the circular body relative to the text bounds
+              const diameter = collisionBox.radius * 2
+              const offsetX = (textWidth - diameter) / 2
+              const offsetY = (textHeight - diameter) / 2
+              body.setOffset(offsetX, offsetY)
+            } else {
+              body.setCircle(collisionBox.radius)
+            }
+          }
+        }
         // For text objects, set the body size to match the text display size
-        if (gameObject instanceof Phaser.GameObjects.Text) {
+        else if (gameObject instanceof Phaser.GameObjects.Text) {
           // Use display width/height instead of bounds
           body.setSize(gameObject.displayWidth, gameObject.displayHeight)
         }
@@ -343,20 +395,29 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
 
     private createInteractionHandler(callback: string) {
       return (
-        _obj1: Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody | Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
+        obj1: Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody | Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile,
         obj2: Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody | Phaser.Types.Physics.Arcade.GameObjectWithBody | Phaser.Tilemaps.Tile
       ) => {
         // First check if it's a registered action
         const action = this.state.actions.get(callback)
         if (action) {
-          // Extract GameObject from the various types
-          let gameObj: Phaser.GameObjects.GameObject | undefined
-          if ('gameObject' in obj2) {
-            gameObj = obj2.gameObject as Phaser.GameObjects.GameObject
-          } else if (obj2 instanceof Phaser.GameObjects.GameObject) {
-            gameObj = obj2
+          // Extract GameObjects from both collision objects
+          let gameObj1: Phaser.GameObjects.GameObject | undefined
+          let gameObj2: Phaser.GameObjects.GameObject | undefined
+
+          if ('gameObject' in obj1) {
+            gameObj1 = obj1.gameObject as Phaser.GameObjects.GameObject
+          } else if (obj1 instanceof Phaser.GameObjects.GameObject) {
+            gameObj1 = obj1
           }
-          this.executeAction(action.effect, gameObj)
+
+          if ('gameObject' in obj2) {
+            gameObj2 = obj2.gameObject as Phaser.GameObjects.GameObject
+          } else if (obj2 instanceof Phaser.GameObjects.GameObject) {
+            gameObj2 = obj2
+          }
+
+          this.executeAction(action.effect, gameObj2, gameObj1)
           return
         }
 
@@ -386,13 +447,25 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       }
     }
 
-    private executeAction(effect: ActionEffect, targetObj?: Phaser.GameObjects.GameObject) {
+    private executeAction(
+      effect: ActionEffect,
+      targetObj?: Phaser.GameObjects.GameObject,
+      sourceObj?: Phaser.GameObjects.GameObject
+    ) {
       switch (effect.type) {
         case 'updateScore':
           this.state.score += effect.points
           this.updateScoreDisplay()
+          // Always destroy the target object
           if (targetObj) {
             targetObj.destroy()
+          }
+          // Only destroy source object if it's a projectile
+          if (sourceObj) {
+            const projectilesGroup = this.state.groups.get('projectiles')
+            if (projectilesGroup && projectilesGroup.contains(sourceObj)) {
+              sourceObj.destroy()
+            }
           }
           break
         case 'gameOver':
@@ -530,6 +603,38 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
         const group = this.state.groups.get(templateId)
         if (group) {
           group.add(spawnedObj)
+
+          // IMPORTANT: Re-apply physics settings after adding to group
+          // Adding to group can reset body properties
+          if (spawner.template.physics && hasArcadeBody(spawnedObj)) {
+            const body = spawnedObj.body
+
+            // Re-apply collision box for emoji objects
+            if (spawner.template.type === 'emoji' && spawner.template.emoji?.collision_box) {
+              const collisionBox = spawner.template.emoji.collision_box
+              if (collisionBox.shape === 'rectangle' && collisionBox.width && collisionBox.height) {
+                body.setSize(collisionBox.width, collisionBox.height)
+                if (spawnedObj instanceof Phaser.GameObjects.Text) {
+                  const offsetX = (spawnedObj.width - collisionBox.width) / 2
+                  const offsetY = (spawnedObj.height - collisionBox.height) / 2
+                  body.setOffset(offsetX, offsetY)
+                }
+              } else if (collisionBox.shape === 'circle' && collisionBox.radius) {
+                body.setCircle(collisionBox.radius)
+                if (spawnedObj instanceof Phaser.GameObjects.Text) {
+                  const diameter = collisionBox.radius * 2
+                  const offsetX = (spawnedObj.width - diameter) / 2
+                  const offsetY = (spawnedObj.height - diameter) / 2
+                  body.setOffset(offsetX, offsetY)
+                }
+              }
+            }
+
+            // Re-apply velocity if it was reset
+            if (spawner.template.physics.velocity) {
+              body.setVelocity(spawner.template.physics.velocity.x, spawner.template.physics.velocity.y)
+            }
+          }
         }
 
         // Increment counter
@@ -642,6 +747,18 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
           }
           break
 
+        case 'emoji':
+          if (template.emoji) {
+            const emoji = this.add.text(position.x, position.y, template.emoji.emoji, {
+              fontSize: `${template.emoji.size || 32}px`,
+              color: '#ffffff',
+            })
+            // Center the emoji
+            emoji.setOrigin(0.5, 0.5)
+            gameObject = emoji
+          }
+          break
+
         case 'sprite':
           if (template.texture) {
             const sprite = this.add.sprite(position.x, position.y, template.texture)
@@ -656,7 +773,7 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
 
       // Apply physics from template
       if (template.physics) {
-        this.applyPhysics(gameObject, template.physics)
+        this.applyPhysics(gameObject, template.physics, template)
       }
 
       // Note: Behavior state is managed separately in this.state.behaviorState
@@ -768,10 +885,14 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
       // Create a unique ID for the projectile
       const projectileId = `projectile_${this.state.projectileCounter++}`
 
-      // Determine spawn position (slightly offset from shooter)
-      const shooterBody = shooter.body
-      const spawnX = shooterBody.x
-      const spawnY = shooterBody.y
+      // Determine spawn position from the game object's position (center), not the body
+      let spawnX = 0
+      let spawnY = 0
+
+      if ('x' in shooter && 'y' in shooter) {
+        spawnX = shooter.x as number
+        spawnY = shooter.y as number
+      }
 
       // Create the projectile using the template
       const projectile = this.createSpawnedObject(projectileTemplate, { x: spawnX, y: spawnY })
@@ -784,11 +905,36 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
         const projectilesGroup = this.state.groups.get('projectiles')
         if (projectilesGroup) {
           projectilesGroup.add(projectile)
-        }
 
-        // Fix: Adding to group sometimes resets velocity, so re-apply if needed
-        if (projectile.body.velocity.x === 0 && projectile.body.velocity.y === 0 && projectileTemplate.physics?.velocity) {
-          projectile.body.setVelocity(projectileTemplate.physics.velocity.x, projectileTemplate.physics.velocity.y)
+          // IMPORTANT: Re-apply physics settings after adding to group
+          // Adding to group can reset body properties
+          const body = projectile.body
+
+          // Re-apply collision box for emoji projectiles
+          if (projectileTemplate.type === 'emoji' && projectileTemplate.emoji?.collision_box) {
+            const collisionBox = projectileTemplate.emoji.collision_box
+            if (collisionBox.shape === 'rectangle' && collisionBox.width && collisionBox.height) {
+              body.setSize(collisionBox.width, collisionBox.height)
+              if (projectile instanceof Phaser.GameObjects.Text) {
+                const offsetX = (projectile.width - collisionBox.width) / 2
+                const offsetY = (projectile.height - collisionBox.height) / 2
+                body.setOffset(offsetX, offsetY)
+              }
+            } else if (collisionBox.shape === 'circle' && collisionBox.radius) {
+              body.setCircle(collisionBox.radius)
+              if (projectile instanceof Phaser.GameObjects.Text) {
+                const diameter = collisionBox.radius * 2
+                const offsetX = (projectile.width - diameter) / 2
+                const offsetY = (projectile.height - diameter) / 2
+                body.setOffset(offsetX, offsetY)
+              }
+            }
+          }
+
+          // Re-apply velocity (adding to group can reset it)
+          if (projectileTemplate.physics?.velocity) {
+            body.setVelocity(projectileTemplate.physics.velocity.x, projectileTemplate.physics.velocity.y)
+          }
         }
 
         // Auto-destroy projectile when it leaves the world bounds

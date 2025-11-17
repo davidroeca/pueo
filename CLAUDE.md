@@ -54,6 +54,86 @@ Example flow:
 ### Active Plugins
 - `tauri-plugin-opener` - Opens URLs and files in default system applications
 
+## Game Builder System
+
+This application includes an AI-powered game builder that creates browser-based games using Phaser 3. The system uses a structured JSON specification to define games.
+
+### Game Object Types
+
+Games support the following object types (defined in `src/types/gameSpec.ts`):
+
+1. **emoji** - Emoji characters with custom collision boxes (🚀, 👾, ⭐, etc.)
+   - Primary choice for game objects - visually appealing and recognizable
+   - Rendered as text with configurable size
+   - Collision detection uses separate collision box (rectangle or circle)
+   - Example: Player as 🏃, enemies as 👾, collectibles as ⭐
+
+2. **rectangle** - Rectangular shapes
+   - Best for platforms, walls, and abstract objects
+   - Color, width, and height configurable
+   - Collision box matches visual exactly
+
+3. **circle** - Circular shapes
+   - Good for simple bullets or abstract objects
+   - Color and radius configurable
+   - Collision box matches visual exactly
+
+4. **text** - Text labels
+   - Used for UI elements (scores, instructions)
+   - No collision detection by default
+
+5. **sprite** - Custom image sprites
+   - Requires external assets
+
+### Emoji Objects and Collision Boxes
+
+Emojis use a **hybrid visual + collision system** (standard in game development):
+
+**Visual Representation:**
+- Rendered as Unicode text at specified size
+- Always centered (origin 0.5, 0.5)
+- Visually expressive and cross-platform
+
+**Physics/Collision:**
+- Separate collision box defines hitbox
+- Can be `rectangle` (width, height) or `circle` (radius)
+- Collision box doesn't need to match emoji visual exactly
+
+**Example:**
+```typescript
+{
+  type: 'emoji',
+  emoji: {
+    emoji: '🚗',
+    size: 40,
+    collision_box: {
+      shape: 'rectangle',
+      width: 40,
+      height: 30
+    }
+  },
+  physics: {
+    body: 'dynamic',
+    collide_world_bounds: true
+  }
+}
+```
+
+### Key Files
+
+- **Game builder prompt:** `src-tauri/src/game_builder.rs` - System prompt and Rust type definitions
+- **TypeScript types:** `src/types/gameSpec.ts` - Game specification types
+- **Phaser renderer:** `src/utils/phaserRenderer.ts` - Converts JSON specs to running Phaser games
+- **Sample games:** `src/utils/sampleGames.ts` - Example game specifications
+
+### Design Philosophy
+
+The game builder **emphasizes emojis first**, falling back to shapes only when needed:
+- ✅ Use emojis for characters, enemies, collectibles, vehicles, etc.
+- ✅ Use rectangles/circles for platforms, walls, bullets, abstract elements
+- ✅ Collision boxes are standard practice (same as sprite-based games)
+- ✅ Visual appeal > pixel-perfect collision matching
+
 ## Styling Approach
 
 This project uses a **hybrid Tailwind CSS approach** that balances maintainability with flexibility.

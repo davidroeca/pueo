@@ -66,13 +66,17 @@ export const samplePlatformer: PhaserGameSpec = {
         // Player
         {
           id: 'player',
-          type: 'rectangle',
+          type: 'emoji',
           x: 100,
           y: 450,
-          shape: {
-            width: 32,
-            height: 48,
-            color: '#0000ff',
+          emoji: {
+            emoji: '🏃',
+            size: 48,
+            collision_box: {
+              shape: 'rectangle',
+              width: 32,
+              height: 48,
+            },
           },
           physics: {
             body: 'dynamic',
@@ -88,12 +92,16 @@ export const samplePlatformer: PhaserGameSpec = {
         // Star 1
         {
           id: 'star1',
-          type: 'circle',
+          type: 'emoji',
           x: 150,
           y: 200,
-          shape: {
-            radius: 10,
-            color: '#ffff00',
+          emoji: {
+            emoji: '⭐',
+            size: 32,
+            collision_box: {
+              shape: 'circle',
+              radius: 16,
+            },
           },
           physics: {
             body: 'dynamic',
@@ -104,12 +112,16 @@ export const samplePlatformer: PhaserGameSpec = {
         // Star 2
         {
           id: 'star2',
-          type: 'circle',
+          type: 'emoji',
           x: 600,
           y: 350,
-          shape: {
-            radius: 10,
-            color: '#ffff00',
+          emoji: {
+            emoji: '⭐',
+            size: 32,
+            collision_box: {
+              shape: 'circle',
+              radius: 16,
+            },
           },
           physics: {
             body: 'dynamic',
@@ -192,13 +204,17 @@ export const sampleDodger: PhaserGameSpec = {
         // Player
         {
           id: 'player',
-          type: 'rectangle',
+          type: 'emoji',
           x: 400,
           y: 550,
-          shape: {
-            width: 40,
-            height: 40,
-            color: '#00ff00',
+          emoji: {
+            emoji: '🚀',
+            size: 40,
+            collision_box: {
+              shape: 'rectangle',
+              width: 40,
+              height: 40,
+            },
           },
           physics: {
             body: 'dynamic',
@@ -244,12 +260,16 @@ export const sampleDodger: PhaserGameSpec = {
             },
             template: {
               id: 'enemy_template',
-              type: 'circle',
+              type: 'emoji',
               x: 0,
               y: 0,
-              shape: {
-                radius: 20,
-                color: '#ff0000',
+              emoji: {
+                emoji: '👾',
+                size: 40,
+                collision_box: {
+                  shape: 'circle',
+                  radius: 20,
+                },
               },
               physics: {
                 body: 'dynamic',

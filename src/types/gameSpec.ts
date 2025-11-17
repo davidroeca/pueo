@@ -60,7 +60,7 @@ export interface Controls {
   projectile?: GameObject
 }
 
-export type ObjectType = 'sprite' | 'rectangle' | 'circle' | 'text' | 'group'
+export type ObjectType = 'sprite' | 'rectangle' | 'circle' | 'text' | 'emoji' | 'group'
 
 export interface ShapeProperties {
   width?: number
@@ -75,6 +75,21 @@ export interface TextProperties {
   fill?: string
 }
 
+export interface EmojiProperties {
+  emoji: string
+  size?: number
+  collision_box: CollisionBox
+}
+
+export type CollisionBoxShape = 'rectangle' | 'circle'
+
+export interface CollisionBox {
+  shape: CollisionBoxShape
+  width?: number
+  height?: number
+  radius?: number
+}
+
 export type BehaviorType = 'patrol' | 'follow' | 'static' | 'random'
 
 export interface GameObject {
@@ -85,6 +100,7 @@ export interface GameObject {
   texture?: string
   shape?: ShapeProperties
   text?: TextProperties
+  emoji?: EmojiProperties
   physics?: ObjectPhysics
   controls?: Controls
   behavior?: BehaviorType
