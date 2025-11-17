@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
+import { Sun, Moon } from 'lucide-react'
 import { useChatStore } from '@/store/useChatStore'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { GameBuilder } from '@/components/GameBuilder'
@@ -183,7 +184,7 @@ function App() {
             className="ml-4 p-2 btn-sm"
             title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
           >
-            {theme === 'light' ? '☀️' : '🌙'}
+            {theme === 'light' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
 

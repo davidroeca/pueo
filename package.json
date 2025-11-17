@@ -12,6 +12,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "lucide-react": "^0.553.0",
     "markdown-to-jsx": "^8.0.0",
     "phaser": "^3.90.0",
     "react": "^19.1.0",

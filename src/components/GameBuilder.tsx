@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { Check, Brain, Cog } from 'lucide-react'
 import { useChatStore, ChatMessage } from '@/store/useChatStore'
 import { Markdown } from '@/components/Markdown'
 import { PhaserGameRenderer } from '@/components/PhaserGameRenderer'
@@ -92,7 +93,7 @@ export function GameBuilder() {
       {showNewGameNotification && (
         <div className="fixed top-20 right-5 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in">
           <div className="flex items-center gap-2">
-            <span className="text-xl">✓</span>
+            <Check size={20} />
             <span className="font-semibold">Game Ready!</span>
           </div>
           <div className="text-sm mt-1">Click "Play Game" to preview</div>
@@ -123,8 +124,18 @@ export function GameBuilder() {
 
             {activeToolCall && (
               <div className="mb-4 p-2.5 rounded-md bg-purple-50 dark:bg-purple-900/30 mr-[10%] border-l-4 border-purple-500">
-                <div className="font-bold mb-1 text-purple-700 dark:text-purple-300">
-                  {activeToolCall.name === 'thinking' ? '💭 Thinking...' : '⚙️ Generating Game...'}
+                <div className="font-bold mb-1 text-purple-700 dark:text-purple-300 flex items-center gap-2">
+                  {activeToolCall.name === 'thinking' ? (
+                    <>
+                      <Brain size={16} />
+                      <span>Thinking...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Cog size={16} className="animate-spin" />
+                      <span>Generating Game...</span>
+                    </>
+                  )}
                 </div>
                 <div className="text-sm text-purple-600 dark:text-purple-400">
                   {activeToolCall.name === 'thinking'
