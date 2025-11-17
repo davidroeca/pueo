@@ -1,6 +1,7 @@
 import { useState, useEffect, memo } from 'react'
 import { useThrottledDebounce } from '@/hooks/useThrottledDebounce'
 import { highlightCode } from '@/highlighter'
+import { useSettingsStore } from '@/store/useSettingsStore'
 
 interface CodeBlockProps {
   className?: string
@@ -25,9 +26,22 @@ const HighlightedCode = memo(({ html }: { html: string }) => {
 export function CodeBlock({ className, children }: CodeBlockProps) {
   const [html, setHtml] = useState<string>('')
   const [error, setError] = useState<Error | null>(null)
+  const { theme } = useSettingsStore()
 
   const lang = className?.replace(/^lang-/, '') || 'text'
   const rawCode = String(children)
+
+  // Check if this is inline code (no className means inline)
+  const isInline = !className
+
+  // For inline code, render it with simple styling
+  if (isInline) {
+    return (
+      <code className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm font-mono">
+        {children}
+      </code>
+    )
+  }
 
   // Extract only complete lines (ending with \n)
   const lastNewlineIndex = rawCode.lastIndexOf('\n')
@@ -47,7 +61,8 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
     const abortController = new AbortController()
     setError(null)
 
-    highlightCode(code, lang, true, PRE_CLASS, abortController.signal)
+    const isDark = theme === 'dark'
+    highlightCode(code, lang, isDark, PRE_CLASS, abortController.signal)
       .then((result) => {
         if (!abortController.signal.aborted) {
           setHtml(result)
@@ -67,7 +82,7 @@ export function CodeBlock({ className, children }: CodeBlockProps) {
     return () => {
       abortController.abort()
     }
-  }, [code, lang])
+  }, [code, lang, theme])
 
   // Show error fallback
   if (error) {

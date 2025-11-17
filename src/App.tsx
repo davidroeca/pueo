@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
 import { useChatStore } from '@/store/useChatStore'
+import { useSettingsStore } from '@/store/useSettingsStore'
 import { GameBuilder } from '@/components/GameBuilder'
 import { GameLibrary } from '@/components/GameLibrary'
 import { GameRendererTest } from '@/components/GameRendererTest'
@@ -26,6 +27,17 @@ function App() {
     setGeneratedGameSpec,
     setActiveToolCall,
   } = useChatStore()
+
+  const { theme, toggleTheme } = useSettingsStore()
+
+  // Initialize theme on mount
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [theme])
 
   // Check if AI is already initialized (from .env)
   useEffect(() => {
@@ -148,6 +160,13 @@ function App() {
         <div className="flex flex-row gap-3 items-center">
           <Logo className="h-[80px] w-[80px]" />
           <h1 className="text-center text-4xl font-bold">Pueo</h1>
+          <button
+            onClick={toggleTheme}
+            className="ml-4 p-2 rounded-lg border border-transparent bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white hover:border-blue-600 transition-colors"
+            title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+          >
+            {theme === 'light' ? '🌙' : '☀️'}
+          </button>
         </div>
 
         {/* Navigation tabs */}
