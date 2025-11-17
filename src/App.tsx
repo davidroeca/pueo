@@ -180,7 +180,7 @@ function App() {
           <h1 className="text-center text-4xl font-bold">Pueo</h1>
           <button
             onClick={toggleTheme}
-            className="ml-4 p-2 rounded-lg border border-transparent bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white hover:border-blue-600 transition-colors"
+            className="ml-4 p-2 btn-sm"
             title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
           >
             {theme === 'light' ? '🌙' : '☀️'}
@@ -192,31 +192,19 @@ function App() {
           <div className="flex gap-2">
             <button
               onClick={() => setCurrentView('chat')}
-              className={`text-sm rounded-lg border px-4 py-2 transition-colors ${
-                currentView === 'chat'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white border-transparent hover:border-blue-600'
-              }`}
+              className={currentView === 'chat' ? 'btn-tab-active' : 'btn-tab'}
             >
               Game Builder
             </button>
             <button
               onClick={() => setCurrentView('library')}
-              className={`text-sm rounded-lg border px-4 py-2 transition-colors ${
-                currentView === 'library'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white border-transparent hover:border-blue-600'
-              }`}
+              className={currentView === 'library' ? 'btn-tab-active' : 'btn-tab'}
             >
               Library
             </button>
             <button
               onClick={() => setCurrentView('test')}
-              className={`text-sm rounded-lg border px-4 py-2 transition-colors ${
-                currentView === 'test'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white border-transparent hover:border-blue-600'
-              }`}
+              className={currentView === 'test' ? 'btn-tab-active' : 'btn-tab'}
             >
               Test
             </button>
@@ -235,7 +223,7 @@ function App() {
       {!isInitialized ? (
         <div className="max-w-[500px] mx-auto p-10">
           <h2>Initialize AI Client</h2>
-          <p className="text-gray-600 text-sm mb-5 dark:text-gray-400">
+          <p className="text-muted text-sm mb-5">
             Enter your API key, or add{' '}
             <code className="bg-gray-200 px-1 rounded dark:bg-gray-700">
               ANTHROPIC_API_KEY
@@ -258,17 +246,17 @@ function App() {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="Enter your Anthropic API key"
-              className="w-full rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm focus:border-blue-500 focus:outline-none"
+              className="input"
             />
             <button
               type="submit"
-              className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm hover:border-blue-600 active:bg-gray-200 dark:active:bg-gray-900/40 cursor-pointer"
+              className="btn"
             >
               Initialize
             </button>
           </form>
           {initError && (
-            <p className="text-red-600 mt-3 dark:text-red-400">{initError}</p>
+            <p className="text-error mt-3">{initError}</p>
           )}
         </div>
       ) : (

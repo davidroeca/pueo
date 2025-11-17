@@ -74,6 +74,40 @@ npm run tauri build
 - SQLite for persistence
 - Event-driven streaming
 
+### Styling Conventions
+
+This project uses a **hybrid Tailwind approach** to balance maintainability with flexibility:
+
+**Components Layer (`src/globals.css`):**
+- Repeated UI patterns are extracted into `@layer components`
+- Button variants: `.btn`, `.btn-primary`, `.btn-purple`, `.btn-danger`, `.btn-tab`, etc.
+- Input styles: `.input`, `.input-search`
+- Containers: `.card`, `.chat-container`
+- Text utilities: `.text-error`, `.text-muted`
+
+**When to use component classes:**
+- Patterns repeated 3+ times across the codebase
+- Complex utility combinations (50+ characters)
+- Dark mode variants that appear frequently
+
+**When to keep utilities inline:**
+- One-off layouts and spacing (flex, grid, margins, padding)
+- Unique component-specific styles
+- Layout adjustments that won't be reused
+
+**Example:**
+```tsx
+// ✅ Good - uses component class for button, utilities for layout
+<button className="btn-primary mb-4">Save</button>
+
+// ❌ Avoid - repeating long utility strings
+<button className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm cursor-pointer">
+  Save
+</button>
+```
+
+See `src/globals.css` for all available component classes.
+
 ### How It Works
 
 ```mermaid

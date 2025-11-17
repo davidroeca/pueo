@@ -90,7 +90,7 @@ export function GameLibrary() {
         <button
           onClick={loadGames}
           disabled={loading}
-          className="rounded-lg border border-transparent px-4 py-2 text-sm font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm hover:border-blue-600 cursor-pointer disabled:opacity-50"
+          className="btn-refresh"
         >
           {loading ? 'Loading...' : 'Refresh'}
         </button>
@@ -103,7 +103,7 @@ export function GameLibrary() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search games by title or description..."
-          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-base bg-white dark:bg-gray-900 transition-colors shadow-sm focus:border-blue-500 focus:outline-none"
+          className="input-search"
         />
       </div>
 
@@ -116,7 +116,7 @@ export function GameLibrary() {
 
       {/* Empty state */}
       {!loading && filteredGames.length === 0 && (
-        <div className="text-center py-20 text-gray-500 dark:text-gray-400">
+        <div className="text-center py-20 text-muted">
           {searchQuery ? 'No games found matching your search.' : 'No games yet. Create one in the Game Builder!'}
         </div>
       )}
@@ -126,25 +126,25 @@ export function GameLibrary() {
         {filteredGames.map((game) => (
           <div
             key={game.id}
-            className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-900 hover:border-blue-500 dark:hover:border-blue-400 transition-colors"
+            className="card"
           >
             <h3 className="text-lg font-semibold mb-2">{game.title}</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+            <p className="text-sm text-muted mb-3 line-clamp-2">
               {game.description}
             </p>
-            <div className="text-xs text-gray-500 dark:text-gray-500 mb-4">
+            <div className="text-xs text-muted mb-4">
               Created: {formatDate(game.created_at)}
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => playGame(game.id)}
-                className="flex-1 text-sm rounded border border-transparent px-3 py-2 text-white bg-purple-600 hover:bg-purple-700 transition-colors cursor-pointer"
+                className="flex-1 btn-purple-sm"
               >
                 Play
               </button>
               <button
                 onClick={() => deleteGame(game.id, game.title)}
-                className="text-sm rounded border border-transparent px-3 py-2 text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer"
+                className="btn-danger-sm"
               >
                 Delete
               </button>

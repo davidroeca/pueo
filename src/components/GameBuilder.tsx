@@ -102,7 +102,7 @@ export function GameBuilder() {
       <div className="max-w-4xl mx-auto">
           <h3 className="text-xl font-semibold mb-3">Chat</h3>
 
-          <div className="min-h-[400px] max-h-[600px] text-left overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-5 mb-5 bg-white dark:bg-gray-900">
+          <div className="min-h-[400px] max-h-[600px] text-left chat-container mb-5">
             {messages
               .filter((msg) => msg.role !== 'system')
               .map((msg) => (
@@ -144,7 +144,7 @@ export function GameBuilder() {
           </div>
 
           {error && (
-            <p className="text-red-600 mb-3 dark:text-red-400">
+            <p className="text-error mb-3">
               Error: {error}
             </p>
           )}
@@ -162,12 +162,12 @@ export function GameBuilder() {
               onChange={(e) => setInput(e.target.value)}
               placeholder={'Describe the game you want to build...'}
               disabled={isStreaming}
-              className="flex-1 rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm focus:border-blue-500 focus:outline-none disabled:opacity-50"
+              className="flex-1 input"
             />
             <button
               type="submit"
               disabled={isStreaming}
-              className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm hover:border-blue-600 active:bg-gray-200 dark:active:bg-gray-900/40 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn"
             >
               Send
             </button>
@@ -176,14 +176,14 @@ export function GameBuilder() {
                 <button
                   type="button"
                   onClick={() => setShowGameRenderer(true)}
-                  className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-white bg-purple-600 hover:bg-purple-700 transition-colors shadow-sm cursor-pointer"
+                  className="btn-purple"
                 >
                   Play Game
                 </button>
                 <button
                   type="button"
                   onClick={saveGame}
-                  className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm cursor-pointer"
+                  className="btn-primary"
                 >
                   Save Game
                 </button>
@@ -192,7 +192,7 @@ export function GameBuilder() {
             <button
               type="button"
               onClick={clearChat}
-              className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm hover:border-blue-600 active:bg-gray-200 dark:active:bg-gray-900/40 cursor-pointer"
+              className="btn"
             >
               Clear
             </button>
