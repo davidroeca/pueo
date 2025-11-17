@@ -1,6 +1,11 @@
 # Pueo
 
-<img src="./public/pueo.png" width="200" height="200" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" width="200" height="200" srcset="./public/pueo-dark.png">
+  <source media="(prefers-color-scheme: light)" width="200" height="200" srcset="./public/pueo.png">
+  <img alt="Pueo logo" src="./public/pueo-fallback.png">
+</picture>
+
 
 Named after the owl endemic to Hawaii, Pueo is an AI-powered game builder that helps you create browser-based games through natural conversation. Built with [Tauri](https://v2.tauri.app/), React, and Claude AI.
 
