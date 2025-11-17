@@ -246,11 +246,21 @@ async fn stream_chat(
     };
 
     // Stream tokens to frontend
+    let mut has_finalized = false;
     while let Some(result) = stream.next().await {
         match result {
             Ok(chunk) => match chunk {
                 MultiTurnStreamItem::StreamItem(item) => {
                     if let StreamedAssistantContent::Text(text) = item {
+                        // If we've already finalized a response and now receiving new items,
+                        // this is a new turn (agent is responding again after tool use)
+                        if has_finalized {
+                            window
+                                .emit("chat-new-turn", ())
+                                .map_err(|e| format!("Failed to emit new turn: {}", e))?;
+                            has_finalized = false;
+                        }
+
                         window
                             .emit("chat-token", &text.text)
                             .map_err(|e| format!("Failed to emit token: {}", e))?;
@@ -260,6 +270,7 @@ async fn stream_chat(
                     window
                         .emit("chat-final-response", &response.response())
                         .map_err(|e| format!("Failed to emit token: {}", e))?;
+                    has_finalized = true;
                 }
                 _ => (),
             },

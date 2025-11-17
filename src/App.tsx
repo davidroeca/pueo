@@ -87,6 +87,23 @@ function App() {
         }
       )
 
+      // Listen for new turn (when agent responds again after tool use)
+      const unlistenNewTurn = await listen('chat-new-turn', () => {
+        // Get the current streaming response from the store
+        const store = useChatStore.getState()
+        const currentStreaming = store.streamingResponse
+
+        if (currentStreaming) {
+          store.addMessage({
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: currentStreaming,
+          })
+        }
+        // Clear streaming response to start fresh for the new turn
+        store.setStreamingResponse('')
+      })
+
       const unlistenFinalResponse = await listen<string>(
         'chat-final-response',
         (event) => {
@@ -132,6 +149,7 @@ function App() {
         unlistenReasoning,
         unlistenToolExecuting,
         unlistenToolCall,
+        unlistenNewTurn,
         unlistenFinalResponse,
         unlistenComplete,
         unlistenError,
