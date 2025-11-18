@@ -1,10 +1,9 @@
 use futures::StreamExt;
 use rig::agent::MultiTurnStreamItem;
 use rig::client::CompletionClient;
-use rig::completion::{Chat, Message, Prompt};
-use rig::extractor::ExtractorBuilder;
+use rig::completion::Message;
 use rig::providers::anthropic;
-use rig::streaming::{StreamedAssistantContent, StreamingChat, StreamingPrompt};
+use rig::streaming::{StreamedAssistantContent, StreamedUserContent, StreamingChat, StreamingPrompt};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::{Emitter, Manager, State, Window};
@@ -101,21 +100,15 @@ async fn stream_chat(
         .tool(game_builder::create_phaser_game_tool())
         .build();
 
-    // Create streaming completion
+    // Create streaming completion with multi-turn enabled for automatic tool execution
+    // Max depth of 5 allows the agent to call tools up to 5 times before requiring a text response
     let mut stream = if history.is_empty() {
         // Simple prompt if no history
-        agent.stream_prompt(&last_user_message).await
+        agent.stream_prompt(&last_user_message).multi_turn(5).await
     } else {
         // Chat with history
-        agent.stream_chat(&last_user_message, history).await
+        agent.stream_chat(&last_user_message, history).multi_turn(5).await
     };
-
-    // Define the tool extractor for the game spec
-    let extractor = ExtractorBuilder::<_, game_builder::PhaserGameSpec>::new(
-        client.completion_model(&model_name)
-    )
-        .preamble("Extract the game specification from the following text. If there's a complete game spec described, extract it.")
-        .build();
 
     // Stream tokens to frontend and accumulate the full response
     let mut accumulated_response = String::new();
@@ -131,42 +124,33 @@ async fn stream_chat(
                             .map_err(|e| format!("Failed to emit token: {}", e))?;
                     }
                     StreamedAssistantContent::ToolCall(tool_call) => {
-                        // Show extraction indicator
+                        // With multi_turn enabled, rig automatically executes tools
+                        // Emit the tool call event with the game spec
                         window
-                            .emit("tool-executing", "generate_phaser_game")
-                            .map_err(|e| format!("Failed to emit tool-executing: {}", e))?;
-
-                        // Try to extract the game spec
-                        match extractor.extract(&tool_call).await {
-                            Ok(game_spec) => {
-                                // Emit the tool call with the extracted game spec
-                                window
-                                    .emit(
-                                        "tool-call",
-                                        serde_json::json!({
-                                            "function": {
-                                                "name": "generate_phaser_game",
-                                                "arguments": &game_spec
-                                            }
-                                        }),
-                                    )
-                                    .map_err(|e| format!("Failed to emit tool call: {}", e))?;
-                            }
-                            Err(e) => {
-                                // Emit extraction-failed event to clear the loading indicator
-                                window
-                                    .emit(
-                                        "extraction-failed",
-                                        format!("Could not extract game specification: {}", e),
-                                    )
-                                    .map_err(|e| {
-                                        format!("Failed to emit extraction-failed: {}", e)
-                                    })?;
-                            }
-                        }
+                            .emit(
+                                "tool-call",
+                                serde_json::json!({
+                                    "function": {
+                                        "name": &tool_call.function.name,
+                                        "arguments": &tool_call.function.arguments
+                                    }
+                                }),
+                            )
+                            .map_err(|e| format!("Failed to emit tool call: {}", e))?;
                     }
                     _ => (),
                 },
+                MultiTurnStreamItem::StreamUserItem(user_item) => {
+                    // This is emitted after a tool is executed (tool result)
+                    // We can use this to emit a tool-result event to the frontend
+                    match user_item {
+                        StreamedUserContent::ToolResult(result) => {
+                            window
+                                .emit("tool-result", &result.content)
+                                .map_err(|e| format!("Failed to emit tool result: {}", e))?;
+                        }
+                    }
+                }
                 MultiTurnStreamItem::FinalResponse(response) => {
                     // Emit the final response first
                     window

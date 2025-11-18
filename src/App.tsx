@@ -67,26 +67,29 @@ function App() {
         setActiveToolCall({ name: 'thinking', timestamp: Date.now() })
       })
 
-      // Listen for tool execution
-      const unlistenToolExecuting = await listen<string>('tool-executing', (event) => {
-        setActiveToolCall({ name: event.payload, timestamp: Date.now() })
-      })
-
-      // Listen for tool calls (from stream)
+      // Listen for tool calls (when LLM decides to call a tool)
+      // With multi-turn enabled, the tool is automatically executed by rig
       const unlistenToolCall = await listen<{ function: { name: string; arguments: unknown } }>(
         'tool-call',
         (event) => {
           const toolCall = event.payload
 
           if (toolCall.function.name === 'generate_phaser_game') {
+            // Show "Generating Game..." indicator while tool executes
+            setActiveToolCall({ name: toolCall.function.name, timestamp: Date.now() })
+
             const gameSpec = toolCall.function.arguments as PhaserGameSpec
             setGeneratedGameSpec(gameSpec)
           }
-
-          // Clear the tool execution indicator after successful extraction
-          setActiveToolCall(null)
         }
       )
+
+      // Listen for tool results (after tool execution completes)
+      const unlistenToolResult = await listen<string>('tool-result', () => {
+        // Tool execution completed, clear the indicator
+        // The result is the JSON string returned by the tool
+        setActiveToolCall(null)
+      })
 
       // Listen for new turn (when agent responds again after tool use)
       const unlistenNewTurn = await listen('chat-new-turn', () => {
@@ -138,23 +141,15 @@ function App() {
         setActiveToolCall(null)  // Clear tool indicators on error
       })
 
-      // Listen for extraction failures
-      const unlistenExtractionFailed = await listen<string>('extraction-failed', () => {
-        setActiveToolCall(null)  // Clear the "Generating Game..." indicator
-        // Note: We don't set this as an error since the conversation was successful,
-        // just no game was generated (e.g., user asked a question instead)
-      })
-
       unlisten = [
         unlistenToken,
         unlistenReasoning,
-        unlistenToolExecuting,
         unlistenToolCall,
+        unlistenToolResult,
         unlistenNewTurn,
         unlistenFinalResponse,
         unlistenComplete,
         unlistenError,
-        unlistenExtractionFailed,
       ]
     }
 
