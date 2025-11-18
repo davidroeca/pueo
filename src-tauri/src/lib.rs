@@ -112,12 +112,14 @@ async fn stream_chat(
 
     // Stream tokens to frontend and accumulate the full response
     let mut accumulated_response = String::new();
+    let mut has_received_text = false;
 
     while let Some(result) = stream.next().await {
         match result {
             Ok(chunk) => match chunk {
                 MultiTurnStreamItem::StreamAssistantItem(item) => match item {
                     StreamedAssistantContent::Text(text) => {
+                        has_received_text = true;
                         accumulated_response.push_str(&text.text);
                         window
                             .emit("chat-token", &text.text)
@@ -142,12 +144,20 @@ async fn stream_chat(
                 },
                 MultiTurnStreamItem::StreamUserItem(user_item) => {
                     // This is emitted after a tool is executed (tool result)
-                    // We can use this to emit a tool-result event to the frontend
                     match user_item {
                         StreamedUserContent::ToolResult(result) => {
                             window
                                 .emit("tool-result", &result.content)
                                 .map_err(|e| format!("Failed to emit tool result: {}", e))?;
+
+                            // After tool execution, emit new-turn to signal the frontend
+                            // to save the current streaming content and start a new message
+                            window
+                                .emit("chat-new-turn", ())
+                                .map_err(|e| format!("Failed to emit new-turn: {}", e))?;
+
+                            // Reset the text tracking for the new turn
+                            has_received_text = false;
                         }
                     }
                 }

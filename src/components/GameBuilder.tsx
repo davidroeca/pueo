@@ -8,7 +8,9 @@ import { PhaserGameRenderer } from '@/components/PhaserGameRenderer'
 export function GameBuilder() {
   const [showGameRenderer, setShowGameRenderer] = useState(false)
   const [showNewGameNotification, setShowNewGameNotification] = useState(false)
+  const [showIdleThinking, setShowIdleThinking] = useState(false)
   const previousGameSpecRef = useRef<string | null>(null)
+  const streamingResponseRef = useRef<string>('')
   const {
     messages,
     input,
@@ -24,6 +26,25 @@ export function GameBuilder() {
     generatedGameSpec,
     activeToolCall,
   } = useChatStore()
+
+  // Track when streaming response stops growing (indicates planning phase)
+  useEffect(() => {
+    if (!isStreaming || activeToolCall) {
+      setShowIdleThinking(false)
+      return
+    }
+
+    // If streaming response hasn't changed in 400ms, show thinking indicator
+    const timer = setTimeout(() => {
+      if (streamingResponse === streamingResponseRef.current && isStreaming && !activeToolCall) {
+        setShowIdleThinking(true)
+      }
+    }, 400)
+
+    streamingResponseRef.current = streamingResponse
+
+    return () => clearTimeout(timer)
+  }, [streamingResponse, isStreaming, activeToolCall])
 
   // Show notification when a new game spec is generated
   useEffect(() => {
@@ -123,33 +144,67 @@ export function GameBuilder() {
               </div>
             ))}
 
-          {activeToolCall && (
-            <div className="mb-4 p-2.5 rounded-md bg-purple-50 dark:bg-purple-900/30 mr-[10%] border-l-4 border-purple-500">
-              <div className="font-bold mb-1 text-purple-700 dark:text-purple-300 flex items-center gap-2">
-                {activeToolCall.name === 'thinking' ? (
-                  <>
-                    <Brain size={16} />
-                    <span>Thinking...</span>
-                  </>
-                ) : (
-                  <>
-                    <Cog size={16} className="animate-spin" />
-                    <span>Generating Game...</span>
-                  </>
-                )}
-              </div>
-              <div className="text-sm text-purple-600 dark:text-purple-400">
-                {activeToolCall.name === 'thinking'
-                  ? 'Claude is reasoning about your request...'
-                  : 'Extracting game specification and creating playable game...'}
-              </div>
-            </div>
-          )}
-
+          {/* Show thinking/tool indicators within streaming response box when there's content */}
           {streamingResponse && (
             <div className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[10%]">
               <div className="font-bold mb-1">Assistant</div>
               <Markdown content={streamingResponse} />
+
+              {/* Show thinking indicator below message content when idle */}
+              {showIdleThinking && (
+                <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
+                  <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                    <Brain size={16} />
+                    <span className="text-sm font-medium">Thinking...</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Show tool execution indicator below message content */}
+              {activeToolCall && (
+                <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
+                  <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                    {activeToolCall.name === 'thinking' ? (
+                      <>
+                        <Brain size={16} />
+                        <span className="text-sm font-medium">Thinking...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Cog size={16} className="animate-spin" />
+                        <span className="text-sm font-medium">Generating Game...</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Show thinking/tool indicators as separate box only when no content yet */}
+          {!streamingResponse && (isStreaming || activeToolCall) && (
+            <div className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[10%]">
+              <div className="font-bold mb-1">Assistant</div>
+              <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                {activeToolCall ? (
+                  activeToolCall.name === 'thinking' ? (
+                    <>
+                      <Brain size={16} />
+                      <span className="text-sm font-medium">Thinking...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Cog size={16} className="animate-spin" />
+                      <span className="text-sm font-medium">Generating Game...</span>
+                    </>
+                  )
+                ) : (
+                  <>
+                    <Brain size={16} />
+                    <span className="text-sm font-medium">Thinking...</span>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>

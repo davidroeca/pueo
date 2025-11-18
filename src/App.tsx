@@ -61,9 +61,15 @@ function App() {
         appendStreamingResponse(event.payload)
       })
 
-      // Listen for reasoning (Claude thinking)
+      // Listen for reasoning (Claude extended thinking)
       const unlistenReasoning = await listen<string>('reasoning', () => {
         // Show thinking indicator
+        setActiveToolCall({ name: 'thinking', timestamp: Date.now() })
+      })
+
+      // Listen for thinking (when LLM is planning which tool to call)
+      const unlistenThinking = await listen('thinking', () => {
+        // Show thinking indicator during tool planning phase
         setActiveToolCall({ name: 'thinking', timestamp: Date.now() })
       })
 
@@ -144,6 +150,7 @@ function App() {
       unlisten = [
         unlistenToken,
         unlistenReasoning,
+        unlistenThinking,
         unlistenToolCall,
         unlistenToolResult,
         unlistenNewTurn,

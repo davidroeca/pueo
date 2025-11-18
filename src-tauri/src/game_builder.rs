@@ -4,21 +4,6 @@ use rig::tool::Tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GameTemplate {
-    pub name: String,
-    pub description: String,
-    pub code: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CommonPatterns {
-    pub player_movement: String,
-    pub spawning: String,
-    pub collision: String,
-    pub ui: String,
-}
-
 /// Get the core system prompt for the Phaser game builder agent
 pub fn get_system_prompt() -> String {
     r###"# Phaser Game Builder Agent
