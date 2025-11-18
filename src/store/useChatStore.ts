@@ -40,11 +40,11 @@ interface ChatStore {
   appendStreamingResponse: (chunk: string) => void
   setIsStreaming: (value: boolean) => void
   setError: (error: string) => void
-  setActiveToolCall: (toolCall: { name: string; timestamp: number } | null) => void
+  setActiveToolCall: (
+    toolCall: { name: string; timestamp: number } | null,
+  ) => void
   addMessage: (message: ChatMessage) => void
-  sendStreamingMessage: () => Promise<void>
-  sendNonStreamingMessage: () => Promise<void>
-  sendGameBuilderMessage: () => Promise<void>
+  sendMessage: () => Promise<void>
   clearChat: () => void
   checkInitialization: () => Promise<void>
 
@@ -106,13 +106,16 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   setActiveToolCall: (toolCall) => set({ activeToolCall: toolCall }),
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
-
-  sendStreamingMessage: async () => {
+  sendMessage: async () => {
     const { input, messages, model } = get()
     if (!input.trim()) return
 
     set({ error: '' })
-    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: input }
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: input,
+    }
     const updatedMessages = [...messages, userMessage]
     set({
       messages: updatedMessages,
@@ -123,61 +126,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     try {
       await invoke('stream_chat', {
-        messages: updatedMessages,
-        model,
-      })
-    } catch (err) {
-      set({ error: String(err), isStreaming: false })
-    }
-  },
-
-  sendNonStreamingMessage: async () => {
-    const { input, messages, model } = get()
-    if (!input.trim()) return
-
-    set({ error: '' })
-    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: input }
-    const updatedMessages = [...messages, userMessage]
-    set({
-      messages: updatedMessages,
-      input: '',
-      isStreaming: true,
-    })
-
-    try {
-      const response = await invoke<string>('chat_completion', {
-        messages: updatedMessages,
-        model,
-      })
-
-      set({
-        messages: [
-          ...updatedMessages,
-          { id: crypto.randomUUID(), role: 'assistant', content: response },
-        ],
-        isStreaming: false,
-      })
-    } catch (err) {
-      set({ error: String(err), isStreaming: false })
-    }
-  },
-
-  sendGameBuilderMessage: async () => {
-    const { input, messages, model } = get()
-    if (!input.trim()) return
-
-    set({ error: '' })
-    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: input }
-    const updatedMessages = [...messages, userMessage]
-    set({
-      messages: updatedMessages,
-      input: '',
-      isStreaming: true,
-      streamingResponse: '',
-    })
-
-    try {
-      await invoke('stream_game_builder', {
         messages: updatedMessages,
         model,
       })

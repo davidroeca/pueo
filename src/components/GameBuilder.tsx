@@ -16,7 +16,7 @@ export function GameBuilder() {
     streamingResponse,
     isStreaming,
     error,
-    sendGameBuilderMessage,
+    sendMessage,
     clearChat,
     setMessages,
     systemPrompt,
@@ -43,7 +43,6 @@ export function GameBuilder() {
     }
   }, [generatedGameSpec])
 
-
   const handleSendMessage = async () => {
     let systemMessage: ChatMessage
     if (systemPrompt) {
@@ -68,14 +67,16 @@ export function GameBuilder() {
       setMessages([systemMessage, ...currentMessages])
     }
 
-    await sendGameBuilderMessage()
+    await sendMessage()
   }
 
   const saveGame = async () => {
     if (!generatedGameSpec) return
 
     try {
-      const gameId = await invoke<string>('save_game', { spec: generatedGameSpec })
+      const gameId = await invoke<string>('save_game', {
+        spec: generatedGameSpec,
+      })
       alert(`Game saved successfully! ID: ${gameId}`)
     } catch (err) {
       alert(`Failed to save game: ${err}`)
@@ -101,113 +102,96 @@ export function GameBuilder() {
       )}
 
       <div className="max-w-4xl mx-auto">
-          <h3 className="text-xl font-semibold mb-3">Chat</h3>
+        <h3 className="text-xl font-semibold mb-3">Chat</h3>
 
-          <div className="min-h-[400px] max-h-[600px] text-left chat-container mb-5">
-            {messages
-              .filter((msg) => msg.role !== 'system')
-              .map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`mb-4 p-2.5 rounded-md ${
-                    msg.role === 'user'
-                      ? 'bg-blue-50 dark:bg-blue-900/30 ml-[10%]'
-                      : 'bg-gray-100 dark:bg-gray-800 mr-[10%]'
-                  }`}
-                >
-                  <div className="font-bold mb-1">
-                    {msg.role === 'user' ? 'You' : 'Assistant'}
-                  </div>
-                  <Markdown content={msg.content} />
+        <div className="min-h-[400px] max-h-[600px] text-left chat-container mb-5">
+          {messages
+            .filter((msg) => msg.role !== 'system')
+            .map((msg) => (
+              <div
+                key={msg.id}
+                className={`mb-4 p-2.5 rounded-md ${
+                  msg.role === 'user'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 ml-[10%]'
+                    : 'bg-gray-100 dark:bg-gray-800 mr-[10%]'
+                }`}
+              >
+                <div className="font-bold mb-1">
+                  {msg.role === 'user' ? 'You' : 'Assistant'}
                 </div>
-              ))}
-
-            {activeToolCall && (
-              <div className="mb-4 p-2.5 rounded-md bg-purple-50 dark:bg-purple-900/30 mr-[10%] border-l-4 border-purple-500">
-                <div className="font-bold mb-1 text-purple-700 dark:text-purple-300 flex items-center gap-2">
-                  {activeToolCall.name === 'thinking' ? (
-                    <>
-                      <Brain size={16} />
-                      <span>Thinking...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Cog size={16} className="animate-spin" />
-                      <span>Generating Game...</span>
-                    </>
-                  )}
-                </div>
-                <div className="text-sm text-purple-600 dark:text-purple-400">
-                  {activeToolCall.name === 'thinking'
-                    ? 'Claude is reasoning about your request...'
-                    : 'Extracting game specification and creating playable game...'
-                  }
-                </div>
+                <Markdown content={msg.content} />
               </div>
-            )}
+            ))}
 
-            {streamingResponse && (
-              <div className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[10%]">
-                <div className="font-bold mb-1">Assistant</div>
-                <Markdown content={streamingResponse} />
+          {activeToolCall && (
+            <div className="mb-4 p-2.5 rounded-md bg-purple-50 dark:bg-purple-900/30 mr-[10%] border-l-4 border-purple-500">
+              <div className="font-bold mb-1 text-purple-700 dark:text-purple-300 flex items-center gap-2">
+                {activeToolCall.name === 'thinking' ? (
+                  <>
+                    <Brain size={16} />
+                    <span>Thinking...</span>
+                  </>
+                ) : (
+                  <>
+                    <Cog size={16} className="animate-spin" />
+                    <span>Generating Game...</span>
+                  </>
+                )}
               </div>
-            )}
-          </div>
-
-          {error && (
-            <p className="text-error mb-3">
-              Error: {error}
-            </p>
+              <div className="text-sm text-purple-600 dark:text-purple-400">
+                {activeToolCall.name === 'thinking'
+                  ? 'Claude is reasoning about your request...'
+                  : 'Extracting game specification and creating playable game...'}
+              </div>
+            </div>
           )}
 
-          <form
-            className="flex gap-2.5 items-center"
-            onSubmit={(e) => {
-              e.preventDefault()
-              handleSendMessage()
-            }}
-          >
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={'Describe the game you want to build...'}
-              disabled={isStreaming}
-              className="flex-1 input"
-            />
-            <button
-              type="submit"
-              disabled={isStreaming}
-              className="btn"
-            >
-              Send
-            </button>
-            {generatedGameSpec && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setShowGameRenderer(true)}
-                  className="btn-purple"
-                >
-                  Play Game
-                </button>
-                <button
-                  type="button"
-                  onClick={saveGame}
-                  className="btn-primary"
-                >
-                  Save Game
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={clearChat}
-              className="btn"
-            >
-              Clear
-            </button>
-          </form>
+          {streamingResponse && (
+            <div className="mb-4 p-2.5 rounded-md bg-gray-100 dark:bg-gray-800 mr-[10%]">
+              <div className="font-bold mb-1">Assistant</div>
+              <Markdown content={streamingResponse} />
+            </div>
+          )}
+        </div>
+
+        {error && <p className="text-error mb-3">Error: {error}</p>}
+
+        <form
+          className="flex gap-2.5 items-center"
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleSendMessage()
+          }}
+        >
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={'Describe the game you want to build...'}
+            disabled={isStreaming}
+            className="flex-1 input"
+          />
+          <button type="submit" disabled={isStreaming} className="btn">
+            Send
+          </button>
+          {generatedGameSpec && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowGameRenderer(true)}
+                className="btn-purple"
+              >
+                Play Game
+              </button>
+              <button type="button" onClick={saveGame} className="btn-primary">
+                Save Game
+              </button>
+            </>
+          )}
+          <button type="button" onClick={clearChat} className="btn">
+            Clear
+          </button>
+        </form>
       </div>
 
       {showGameRenderer && generatedGameSpec && (

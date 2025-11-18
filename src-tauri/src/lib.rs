@@ -53,7 +53,7 @@ async fn init_ai(state: State<'_, AppState>, api_key: String) -> Result<String, 
 
 // Stream chat completion with game builder tool
 #[tauri::command]
-async fn stream_game_builder(
+async fn stream_chat(
     window: Window,
     state: State<'_, AppState>,
     messages: Vec<ChatMessage>,
@@ -110,18 +110,60 @@ async fn stream_game_builder(
         agent.stream_chat(&last_user_message, history).await
     };
 
+    // Define the tool extractor for the game spec
+    let extractor = ExtractorBuilder::<_, game_builder::PhaserGameSpec>::new(
+        client.completion_model(&model_name)
+    )
+        .preamble("Extract the game specification from the following text. If there's a complete game spec described, extract it.")
+        .build();
+
     // Stream tokens to frontend and accumulate the full response
     let mut accumulated_response = String::new();
 
     while let Some(result) = stream.next().await {
         match result {
             Ok(chunk) => match chunk {
-                MultiTurnStreamItem::StreamItem(item) => match item {
+                MultiTurnStreamItem::StreamAssistantItem(item) => match item {
                     StreamedAssistantContent::Text(text) => {
                         accumulated_response.push_str(&text.text);
                         window
                             .emit("chat-token", &text.text)
                             .map_err(|e| format!("Failed to emit token: {}", e))?;
+                    }
+                    StreamedAssistantContent::ToolCall(tool_call) => {
+                        // Show extraction indicator
+                        window
+                            .emit("tool-executing", "generate_phaser_game")
+                            .map_err(|e| format!("Failed to emit tool-executing: {}", e))?;
+
+                        // Try to extract the game spec
+                        match extractor.extract(&tool_call).await {
+                            Ok(game_spec) => {
+                                // Emit the tool call with the extracted game spec
+                                window
+                                    .emit(
+                                        "tool-call",
+                                        serde_json::json!({
+                                            "function": {
+                                                "name": "generate_phaser_game",
+                                                "arguments": &game_spec
+                                            }
+                                        }),
+                                    )
+                                    .map_err(|e| format!("Failed to emit tool call: {}", e))?;
+                            }
+                            Err(e) => {
+                                // Emit extraction-failed event to clear the loading indicator
+                                window
+                                    .emit(
+                                        "extraction-failed",
+                                        format!("Could not extract game specification: {}", e),
+                                    )
+                                    .map_err(|e| {
+                                        format!("Failed to emit extraction-failed: {}", e)
+                                    })?;
+                            }
+                        }
                     }
                     _ => (),
                 },
@@ -130,39 +172,6 @@ async fn stream_game_builder(
                     window
                         .emit("chat-final-response", &response.response())
                         .map_err(|e| format!("Failed to emit final response: {}", e))?;
-
-                    // Show extraction indicator
-                    window
-                        .emit("tool-executing", "generate_phaser_game")
-                        .map_err(|e| format!("Failed to emit tool-executing: {}", e))?;
-
-                    // Try to extract game spec from the response text using the extractor
-                    let extractor = ExtractorBuilder::<_, game_builder::PhaserGameSpec>::new(
-                        client.completion_model(&model_name)
-                    )
-                    .preamble("Extract the game specification from the following text. If there's a complete game spec described, extract it.")
-                    .build();
-
-                    // Try to extract the game spec
-                    match extractor.extract(&accumulated_response).await {
-                        Ok(game_spec) => {
-                            // Emit the tool call with the extracted game spec
-                            window
-                                .emit("tool-call", serde_json::json!({
-                                    "function": {
-                                        "name": "generate_phaser_game",
-                                        "arguments": &game_spec
-                                    }
-                                }))
-                                .map_err(|e| format!("Failed to emit tool call: {}", e))?;
-                        }
-                        Err(e) => {
-                            // Emit extraction-failed event to clear the loading indicator
-                            window
-                                .emit("extraction-failed", format!("Could not extract game specification: {}", e))
-                                .map_err(|e| format!("Failed to emit extraction-failed: {}", e))?;
-                        }
-                    }
                 }
                 _ => (),
             },
@@ -181,200 +190,12 @@ async fn stream_game_builder(
         .map_err(|e| format!("Failed to emit completion: {}", e))?;
 
     Ok(())
-}
-
-// Stream chat completion to frontend
-#[tauri::command]
-async fn stream_chat(
-    window: Window,
-    state: State<'_, AppState>,
-    messages: Vec<ChatMessage>,
-    model: Option<String>,
-) -> Result<(), String> {
-    // Get the client from state
-    let client_guard = state.client.lock().await;
-    let client = client_guard
-        .as_ref()
-        .ok_or("AI client not initialized. Call init_ai first.")?;
-
-    // Use specified model or default to claude-sonnet-4-5
-    let model_name = model.unwrap_or_else(|| "claude-sonnet-4-5-20250929".to_string());
-    let agent = client.agent(&model_name).build();
-
-    // Build the chat history - separate system messages, last user message, and history
-    let mut system_prompt = String::new();
-    let mut history = Vec::new();
-    let mut last_user_message = String::new();
-
-    for msg in messages {
-        match msg.role.as_str() {
-            "system" => {
-                if !system_prompt.is_empty() {
-                    system_prompt.push_str("\n");
-                }
-                system_prompt.push_str(&msg.content);
-            }
-            "user" => {
-                last_user_message = msg.content;
-            }
-            "assistant" => {
-                // Add previous user message and this assistant response to history
-                if !last_user_message.is_empty() {
-                    history.push(Message::user(&last_user_message));
-                    last_user_message = String::new();
-                }
-                history.push(Message::assistant(&msg.content));
-            }
-            _ => return Err(format!("Unknown role: {}", msg.role)),
-        }
-    }
-
-    // Apply system prompt if present
-    let agent = if !system_prompt.is_empty() {
-        client.agent(&model_name).preamble(&system_prompt).build()
-    } else {
-        agent
-    };
-
-    // Create streaming completion
-    let mut stream = if history.is_empty() {
-        // Simple prompt if no history
-        agent.stream_prompt(&last_user_message).await
-    } else {
-        // Chat with history
-        agent.stream_chat(&last_user_message, history).await
-    };
-
-    // Stream tokens to frontend
-    let mut has_finalized = false;
-    while let Some(result) = stream.next().await {
-        match result {
-            Ok(chunk) => match chunk {
-                MultiTurnStreamItem::StreamItem(item) => {
-                    if let StreamedAssistantContent::Text(text) = item {
-                        // If we've already finalized a response and now receiving new items,
-                        // this is a new turn (agent is responding again after tool use)
-                        if has_finalized {
-                            window
-                                .emit("chat-new-turn", ())
-                                .map_err(|e| format!("Failed to emit new turn: {}", e))?;
-                            has_finalized = false;
-                        }
-
-                        window
-                            .emit("chat-token", &text.text)
-                            .map_err(|e| format!("Failed to emit token: {}", e))?;
-                    }
-                }
-                MultiTurnStreamItem::FinalResponse(response) => {
-                    window
-                        .emit("chat-final-response", &response.response())
-                        .map_err(|e| format!("Failed to emit token: {}", e))?;
-                    has_finalized = true;
-                }
-                _ => (),
-            },
-            Err(e) => {
-                window
-                    .emit("chat-error", format!("Stream error: {}", e))
-                    .map_err(|e| format!("Failed to emit error: {}", e))?;
-                return Err(format!("Stream error: {}", e));
-            }
-        }
-    }
-
-    // Signal completion
-    window
-        .emit("chat-complete", ())
-        .map_err(|e| format!("Failed to emit completion: {}", e))?;
-
-    Ok(())
-}
-
-// Non-streaming chat (simpler, waits for full response)
-#[tauri::command]
-async fn chat_completion(
-    state: State<'_, AppState>,
-    messages: Vec<ChatMessage>,
-    model: Option<String>,
-) -> Result<String, String> {
-    let client_guard = state.client.lock().await;
-    let client = client_guard
-        .as_ref()
-        .ok_or("AI client not initialized. Call init_ai first.")?;
-
-    let model_name = model.unwrap_or_else(|| "claude-sonnet-4-5-20250929".to_string());
-    let agent = client.agent(&model_name).build();
-
-    // Build the chat history - separate system messages, last user message, and history
-    let mut system_prompt = String::new();
-    let mut history = Vec::new();
-    let mut last_user_message = String::new();
-
-    for msg in messages {
-        match msg.role.as_str() {
-            "system" => {
-                if !system_prompt.is_empty() {
-                    system_prompt.push_str("\n");
-                }
-                system_prompt.push_str(&msg.content);
-            }
-            "user" => {
-                last_user_message = msg.content;
-            }
-            "assistant" => {
-                if !last_user_message.is_empty() {
-                    history.push(Message::user(&last_user_message));
-                    last_user_message = String::new();
-                }
-                history.push(Message::assistant(&msg.content));
-            }
-            _ => return Err(format!("Unknown role: {}", msg.role)),
-        }
-    }
-
-    // Apply system prompt if present
-    let agent = if !system_prompt.is_empty() {
-        client.agent(&model_name).preamble(&system_prompt).build()
-    } else {
-        agent
-    };
-
-    // Get completion
-    let response = if history.is_empty() {
-        agent
-            .prompt(&last_user_message)
-            .await
-            .map_err(|e| format!("Completion failed: {}", e))?
-    } else {
-        agent
-            .chat(&last_user_message, history)
-            .await
-            .map_err(|e| format!("Completion failed: {}", e))?
-    };
-
-    Ok(response)
 }
 
 // Game Builder commands
 #[tauri::command]
 fn get_game_builder_prompt() -> String {
     game_builder::get_system_prompt()
-}
-
-#[tauri::command]
-fn get_game_template(key: String) -> Result<game_builder::GameTemplate, String> {
-    game_builder::get_template(&key).ok_or_else(|| format!("Template '{}' not found", key))
-}
-
-#[tauri::command]
-fn get_game_template_list() -> Vec<(String, String, String)> {
-    game_builder::get_template_list()
-}
-
-#[tauri::command]
-fn get_common_patterns() -> game_builder::CommonPatterns {
-    game_builder::get_common_patterns()
 }
 
 // Database commands for game persistence
@@ -513,12 +334,7 @@ pub fn run() {
             is_ai_initialized,
             init_ai,
             stream_chat,
-            stream_game_builder,
-            chat_completion,
             get_game_builder_prompt,
-            get_game_template,
-            get_game_template_list,
-            get_common_patterns,
             save_game,
             get_game,
             update_game,
