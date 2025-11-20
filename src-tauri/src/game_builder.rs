@@ -4,21 +4,6 @@ use rig::tool::Tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GameTemplate {
-    pub name: String,
-    pub description: String,
-    pub code: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CommonPatterns {
-    pub player_movement: String,
-    pub spawning: String,
-    pub collision: String,
-    pub ui: String,
-}
-
 /// Get the core system prompt for the Phaser game builder agent
 pub fn get_system_prompt() -> String {
     r###"# Phaser Game Builder Agent
@@ -29,14 +14,14 @@ You are an expert Phaser 3 game developer who helps complete beginners create br
 
 1. **Understand Intent**: Ask clarifying questions to understand the game concept (genre, mechanics, win/lose conditions)
 2. **Design the Game**: Think through the objects, physics, controls, and interactions needed
-3. **Use the Tool**: Call the `generate_phaser_game` tool with a complete game specification
-4. **Explain**: Describe what the game does and how to play it in your response
+3. **Use the Tool**: When the game is ready to be built, call the `generate_phaser_game` tool with a complete game specification
+4. **Explain**: After calling the tool, describe what the game does and how to play it in your response
 
-## IMPORTANT: Always Use the Tool
+## Using the tool
 
-When the user asks you to create or modify a game, you MUST use the `generate_phaser_game` tool. The tool takes a structured JSON specification that defines:
+When the user requests that you proceed with building a game, you MUST use the `generate_phaser_game` tool. This is the way you are designed to build games. The tool takes a structured JSON specification that defines:
 - Game configuration (size, physics, background color)
-- Scenes with game objects (rectangles, circles, text)
+- Scenes with game objects (emojis, rectangles, circles, text)
 - Physics properties (gravity, collisions, velocity)
 - Player controls (keyboard input)
 - Custom logic (collisions, overlaps, actions, spawners)
@@ -45,12 +30,13 @@ When the user asks you to create or modify a game, you MUST use the `generate_ph
 
 ## Game Design Guidelines
 
-- **Use simple shapes**: Rectangles and circles for all game objects (no external assets needed)
+- **Use emojis for game objects**: Emojis make games visually appealing and easy to recognize (🚗 for cars, 👾 for enemies, ⭐ for collectibles)
+- **Define collision boxes**: Each emoji needs a collision box (rectangle or circle) for physics interactions
+- **Fallback to shapes when needed**: Use rectangles and circles for platforms, walls, or abstract objects
 - **Target 800x600**: Standard resolution works well for most games
 - **Enable physics when needed**: Platformers need gravity, top-down games don't
 - **Define clear controls**: Use arrow keys, WASD, space bar, or any keyboard key
 - **Add win/lose conditions**: Use actions to trigger gameOver or update score
-- **Use vibrant colors**: Make objects visually distinct with hex colors like #ff0000, #00ff00, #0066ff
 - **Add shooting mechanics**: Use the shoot control with a projectile template for shooter games
 
 ## Creating Actions
@@ -128,10 +114,18 @@ Add shooting to any object with controls using the `shoot` key and `projectile` 
 ```json
 {
   "id": "player",
-  "type": "rectangle",
+  "type": "emoji",
   "x": 100,
   "y": 300,
-  "shape": { "width": 40, "height": 40, "color": "#0066ff" },
+  "emoji": {
+    "emoji": "🚀",
+    "size": 40,
+    "collision_box": {
+      "shape": "rectangle",
+      "width": 40,
+      "height": 40
+    }
+  },
   "physics": {
     "body": "dynamic",
     "collide_world_bounds": true
@@ -142,10 +136,17 @@ Add shooting to any object with controls using the `shoot` key and `projectile` 
     "shoot": "Space",
     "projectile": {
       "id": "bullet",
-      "type": "circle",
+      "type": "emoji",
       "x": 0,
       "y": 0,
-      "shape": { "radius": 5, "color": "#ffff00" },
+      "emoji": {
+        "emoji": "💥",
+        "size": 20,
+        "collision_box": {
+          "shape": "circle",
+          "radius": 10
+        }
+      },
       "physics": {
         "body": "dynamic",
         "velocity": { "x": 400, "y": 0 }
@@ -179,8 +180,15 @@ You can define spawners to create objects dynamically during gameplay:
     },
     "template": {
       "id": "enemy_template",
-      "type": "circle",
-      "shape": { "radius": 20, "color": "#ff0000" },
+      "type": "emoji",
+      "emoji": {
+        "emoji": "👾",
+        "size": 40,
+        "collision_box": {
+          "shape": "circle",
+          "radius": 20
+        }
+      },
       "physics": {
         "body": "dynamic",
         "velocity": { "y": 100 }
@@ -231,153 +239,6 @@ You: [Use the generate_phaser_game tool with a platformer specification, then ex
         .to_string()
 }
 
-/// Get common code patterns for reference
-pub fn get_common_patterns() -> CommonPatterns {
-    CommonPatterns {
-        player_movement: r#"// Keyboard-based player movement
-cursors = this.input.keyboard.createCursorKeys();
-
-// In update():
-if (cursors.left.isDown) {
-    player.setVelocityX(-160);
-} else if (cursors.right.isDown) {
-    player.setVelocityX(160);
-} else {
-    player.setVelocityX(0);
-}
-
-if (cursors.up.isDown && player.body.touching.down) {
-    player.setVelocityY(-330);
-}"#
-        .to_string(),
-
-        spawning: r#"// Spawning objects at random positions
-function spawnEnemy() {
-    const x = Phaser.Math.Between(50, 750);
-    const enemy = this.add.circle(x, 0, 20, 0xff0000);
-    this.physics.add.existing(enemy);
-    enemy.body.setVelocity(Phaser.Math.Between(-50, 50), 100);
-    enemies.add(enemy);
-}
-
-// Call periodically using timer
-this.time.addEvent({
-    delay: 2000,
-    callback: spawnEnemy,
-    callbackScope: this,
-    loop: true
-});"#
-            .to_string(),
-
-        collision: r#"// Collision detection and handling
-this.physics.add.overlap(player, enemies, hitEnemy, null, this);
-
-function hitEnemy(player, enemy) {
-    enemy.destroy();
-    score += 10;
-    scoreText.setText('Score: ' + score);
-}
-
-// For collectibles
-this.physics.add.overlap(player, collectibles, collectItem, null, this);
-
-function collectItem(player, item) {
-    item.destroy();
-    score += 5;
-    scoreText.setText('Score: ' + score);
-}"#
-        .to_string(),
-
-        ui: r#"// Simple score display
-scoreText = this.add.text(16, 16, 'Score: 0', {
-    fontSize: '32px',
-    fill: '#fff'
-});
-scoreText.setScrollFactor(0); // Fixed position (won't move with camera)
-
-// Game over screen
-function showGameOver() {
-    const gameOverText = this.add.text(400, 300, 'GAME OVER', {
-        fontSize: '64px',
-        fill: '#ff0000'
-    });
-    gameOverText.setOrigin(0.5);
-    this.physics.pause();
-}
-
-// Timer display
-let timeLeft = 60;
-timerText = this.add.text(700, 16, 'Time: 60', { fontSize: '32px', fill: '#fff' });
-
-this.time.addEvent({
-    delay: 1000,
-    callback: () => {
-        timeLeft--;
-        timerText.setText('Time: ' + timeLeft);
-        if (timeLeft <= 0) showGameOver.call(this);
-    },
-    callbackScope: this,
-    loop: true
-});"#
-            .to_string(),
-    }
-}
-
-/// Get a specific game template
-pub fn get_template(key: &str) -> Option<GameTemplate> {
-    match key {
-        "platformer" => Some(get_platformer_template()),
-        "dodger" => Some(get_dodger_template()),
-        "clicker" => Some(get_clicker_template()),
-        _ => None,
-    }
-}
-
-/// Get list of all available templates
-pub fn get_template_list() -> Vec<(String, String, String)> {
-    vec![
-        (
-            "platformer".to_string(),
-            "Simple Platformer".to_string(),
-            "A basic platformer with jumping, platforms, and collectibles".to_string(),
-        ),
-        (
-            "dodger".to_string(),
-            "Enemy Dodger".to_string(),
-            "Dodge falling enemies and survive as long as possible".to_string(),
-        ),
-        (
-            "clicker".to_string(),
-            "Click Collector".to_string(),
-            "Click on spawning targets before they disappear".to_string(),
-        ),
-    ]
-}
-
-fn get_platformer_template() -> GameTemplate {
-    GameTemplate {
-        name: "Simple Platformer".to_string(),
-        description: "A basic platformer with jumping, platforms, and collectibles".to_string(),
-        code: include_str!("templates/platformer.html").to_string(),
-    }
-}
-
-fn get_dodger_template() -> GameTemplate {
-    GameTemplate {
-        name: "Enemy Dodger".to_string(),
-        description: "Dodge falling enemies and survive as long as possible".to_string(),
-        code: include_str!("templates/dodger.html").to_string(),
-    }
-}
-
-fn get_clicker_template() -> GameTemplate {
-    GameTemplate {
-        name: "Click Collector".to_string(),
-        description: "Click on spawning targets before they disappear".to_string(),
-        code: include_str!("templates/clicker.html").to_string(),
-    }
-}
-
 // ============================================================================
 // Structured Game Configuration (Tool-based)
 // ============================================================================
@@ -386,8 +247,6 @@ fn get_clicker_template() -> GameTemplate {
 pub enum GameBuilderError {
     #[error("Invalid game configuration: {0}")]
     InvalidConfiguration(String),
-    #[error("Serialization error: {0}")]
-    SerializationError(String),
 }
 
 /// Physics configuration for the game
@@ -534,6 +393,7 @@ pub enum ObjectType {
     Rectangle,
     Circle,
     Text,
+    Emoji,
     Group,
 }
 
@@ -570,6 +430,47 @@ pub struct TextProperties {
     #[schemars(description = "Text color")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fill: Option<String>,
+}
+
+/// Collision box shape types
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum CollisionBoxShape {
+    Rectangle,
+    Circle,
+}
+
+/// Collision box configuration for emojis
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct CollisionBox {
+    #[schemars(description = "Shape type for collision detection")]
+    pub shape: CollisionBoxShape,
+
+    #[schemars(description = "Width (for rectangle collision boxes)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<f32>,
+
+    #[schemars(description = "Height (for rectangle collision boxes)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<f32>,
+
+    #[schemars(description = "Radius (for circle collision boxes)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f32>,
+}
+
+/// Emoji-specific properties
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct EmojiProperties {
+    #[schemars(description = "Emoji character (e.g., '🚀', '👾', '⭐')")]
+    pub emoji: String,
+
+    #[schemars(description = "Font size for the emoji (default: 32)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<f32>,
+
+    #[schemars(description = "Collision box for physics interactions")]
+    pub collision_box: CollisionBox,
 }
 
 /// Behavior types for NPCs/enemies
@@ -609,6 +510,10 @@ pub struct GameObject {
     #[schemars(description = "Text properties (for text objects)")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<TextProperties>,
+
+    #[schemars(description = "Emoji properties (for emoji objects)")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emoji: Option<EmojiProperties>,
 
     #[schemars(description = "Physics configuration")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -771,7 +676,7 @@ impl Tool for PhaserGameTool {
 
     type Error = GameBuilderError;
     type Args = PhaserGameSpec;
-    type Output = String;
+    type Output = PhaserGameSpec;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         let schema = schemars::schema_for!(PhaserGameSpec);
@@ -803,9 +708,7 @@ impl Tool for PhaserGameTool {
             ));
         }
 
-        // Serialize the complete game spec as the response
-        serde_json::to_string_pretty(&args)
-            .map_err(|e| GameBuilderError::SerializationError(e.to_string()))
+        Ok(args)
     }
 }
 

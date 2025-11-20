@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type Phaser from 'phaser'
 import { createPhaserGame } from '@/utils/phaserRenderer'
-import type { PhaserGameSpec } from '@/types/gameSpec'
+import type { PhaserGameSpec } from '@/schemas/gameSpec'
 
 interface PhaserGameRendererProps {
   spec: PhaserGameSpec

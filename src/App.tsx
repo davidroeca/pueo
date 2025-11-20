@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
+import { Sun, Moon } from 'lucide-react'
 import { useChatStore } from '@/store/useChatStore'
+import { useSettingsStore } from '@/store/useSettingsStore'
 import { GameBuilder } from '@/components/GameBuilder'
 import { GameLibrary } from '@/components/GameLibrary'
 import { GameRendererTest } from '@/components/GameRendererTest'
 import { Logo } from '@/components/Logo'
-import type { PhaserGameSpec } from '@/types/gameSpec'
+import { PhaserGameSpecSchema } from '@/schemas/gameSpec'
 
 type View = 'chat' | 'library' | 'test'
 
@@ -27,7 +29,16 @@ function App() {
     setActiveToolCall,
   } = useChatStore()
 
-  // Check if AI is already initialized (from .env)
+  const { theme, toggleTheme } = useSettingsStore()
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [theme])
+
   useEffect(() => {
     checkInitialization()
   }, [checkInitialization])
@@ -43,37 +54,77 @@ function App() {
     let unlisten: UnlistenFn[] = []
 
     const setupListeners = async () => {
-      // Listen for streaming tokens
       const unlistenToken = await listen<string>('chat-token', (event) => {
         appendStreamingResponse(event.payload)
       })
 
-      // Listen for reasoning (Claude thinking)
-      const unlistenReasoning = await listen<string>('reasoning', (event) => {
+      // Listen for reasoning (Claude extended thinking)
+      const unlistenReasoning = await listen<string>('reasoning', () => {
         // Show thinking indicator
         setActiveToolCall({ name: 'thinking', timestamp: Date.now() })
       })
 
-      // Listen for tool execution
-      const unlistenToolExecuting = await listen<string>('tool-executing', (event) => {
-        setActiveToolCall({ name: event.payload, timestamp: Date.now() })
+      // Listen for thinking (when LLM is planning which tool to call)
+      const unlistenThinking = await listen('thinking', () => {
+        // Show thinking indicator during tool planning phase
+        setActiveToolCall({ name: 'thinking', timestamp: Date.now() })
       })
 
-      // Listen for tool calls (from stream)
+      // Listen for tool calls (when LLM decides to call a tool)
+      // With multi-turn enabled, the tool is automatically executed by rig
       const unlistenToolCall = await listen<{ function: { name: string; arguments: unknown } }>(
         'tool-call',
         (event) => {
           const toolCall = event.payload
 
           if (toolCall.function.name === 'generate_phaser_game') {
-            const gameSpec = toolCall.function.arguments as PhaserGameSpec
-            setGeneratedGameSpec(gameSpec)
+            // Show "Generating Game..." indicator while tool executes
+            setActiveToolCall({ name: toolCall.function.name, timestamp: Date.now() })
           }
-
-          // Clear the tool execution indicator after successful extraction
-          setActiveToolCall(null)
         }
       )
+
+      // Listen for tool results (after tool execution completes)
+      // This contains the processed output with defaults applied
+      const unlistenToolResult = await listen<string>('tool-result', (event) => {
+        // Tool execution completed, clear the indicator
+        setActiveToolCall(null)
+
+        // Parse and validate the tool result using Zod
+        console.log(event.payload)
+        try {
+          // This is currently an issue
+          const parsed = JSON.parse(event.payload)
+          const validationResult = PhaserGameSpecSchema.safeParse(parsed)
+
+          if (validationResult.success) {
+            setGeneratedGameSpec(validationResult.data)
+          } else {
+            console.error('Game spec validation failed:', validationResult.error)
+            setError('Invalid game specification: ' + validationResult.error.issues[0]?.message)
+          }
+        } catch (err) {
+          console.error('Failed to parse tool result:', err)
+          setError('Failed to parse game specification')
+        }
+      })
+
+      // Listen for new turn (when agent responds again after tool use)
+      const unlistenNewTurn = await listen('chat-new-turn', () => {
+        // Get the current streaming response from the store
+        const store = useChatStore.getState()
+        const currentStreaming = store.streamingResponse
+
+        if (currentStreaming) {
+          store.addMessage({
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: currentStreaming,
+          })
+        }
+        // Clear streaming response to start fresh for the new turn
+        store.setStreamingResponse('')
+      })
 
       const unlistenFinalResponse = await listen<string>(
         'chat-final-response',
@@ -108,22 +159,16 @@ function App() {
         setActiveToolCall(null)  // Clear tool indicators on error
       })
 
-      // Listen for extraction failures
-      const unlistenExtractionFailed = await listen<string>('extraction-failed', () => {
-        setActiveToolCall(null)  // Clear the "Generating Game..." indicator
-        // Note: We don't set this as an error since the conversation was successful,
-        // just no game was generated (e.g., user asked a question instead)
-      })
-
       unlisten = [
         unlistenToken,
         unlistenReasoning,
-        unlistenToolExecuting,
+        unlistenThinking,
         unlistenToolCall,
+        unlistenToolResult,
+        unlistenNewTurn,
         unlistenFinalResponse,
         unlistenComplete,
         unlistenError,
-        unlistenExtractionFailed,
       ]
     }
 
@@ -148,6 +193,13 @@ function App() {
         <div className="flex flex-row gap-3 items-center">
           <Logo className="h-[80px] w-[80px]" />
           <h1 className="text-center text-4xl font-bold">Pueo</h1>
+          <button
+            onClick={toggleTheme}
+            className="ml-4 p-2 btn-sm"
+            title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          >
+            {theme === 'light' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
         </div>
 
         {/* Navigation tabs */}
@@ -155,31 +207,19 @@ function App() {
           <div className="flex gap-2">
             <button
               onClick={() => setCurrentView('chat')}
-              className={`text-sm rounded-lg border px-4 py-2 transition-colors ${
-                currentView === 'chat'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white border-transparent hover:border-blue-600'
-              }`}
+              className={currentView === 'chat' ? 'btn-tab-active' : 'btn-tab'}
             >
               Game Builder
             </button>
             <button
               onClick={() => setCurrentView('library')}
-              className={`text-sm rounded-lg border px-4 py-2 transition-colors ${
-                currentView === 'library'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white border-transparent hover:border-blue-600'
-              }`}
+              className={currentView === 'library' ? 'btn-tab-active' : 'btn-tab'}
             >
               Library
             </button>
             <button
               onClick={() => setCurrentView('test')}
-              className={`text-sm rounded-lg border px-4 py-2 transition-colors ${
-                currentView === 'test'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white dark:bg-gray-900/60 text-gray-900 dark:text-white border-transparent hover:border-blue-600'
-              }`}
+              className={currentView === 'test' ? 'btn-tab-active' : 'btn-tab'}
             >
               Test
             </button>
@@ -198,7 +238,7 @@ function App() {
       {!isInitialized ? (
         <div className="max-w-[500px] mx-auto p-10">
           <h2>Initialize AI Client</h2>
-          <p className="text-gray-600 text-sm mb-5 dark:text-gray-400">
+          <p className="text-muted text-sm mb-5">
             Enter your API key, or add{' '}
             <code className="bg-gray-200 px-1 rounded dark:bg-gray-700">
               ANTHROPIC_API_KEY
@@ -221,17 +261,17 @@ function App() {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="Enter your Anthropic API key"
-              className="w-full rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm focus:border-blue-500 focus:outline-none"
+              className="input"
             />
             <button
               type="submit"
-              className="rounded-lg border border-transparent px-5 py-3 text-base font-medium text-gray-900 bg-white dark:text-white dark:bg-gray-900/60 transition-colors shadow-sm hover:border-blue-600 active:bg-gray-200 dark:active:bg-gray-900/40 cursor-pointer"
+              className="btn"
             >
               Initialize
             </button>
           </form>
           {initError && (
-            <p className="text-red-600 mt-3 dark:text-red-400">{initError}</p>
+            <p className="text-error mt-3">{initError}</p>
           )}
         </div>
       ) : (

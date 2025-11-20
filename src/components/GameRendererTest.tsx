@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { PhaserGameRenderer } from './PhaserGameRenderer'
 import { samplePlatformer, sampleDodger } from '@/utils/sampleGames'
-import type { PhaserGameSpec } from '@/types/gameSpec'
+import type { PhaserGameSpec } from '@/schemas/gameSpec'
 
 export function GameRendererTest() {
   const [activeGame, setActiveGame] = useState<PhaserGameSpec | null>(null)
