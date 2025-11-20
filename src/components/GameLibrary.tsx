@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { PhaserGameRenderer } from '@/components/PhaserGameRenderer'
-import type { GameSummary, PhaserGameSpec } from '@/types/gameSpec'
+import type { GameSummary, PhaserGameSpec } from '@/schemas/gameSpec'
 
 export function GameLibrary() {
   const [games, setGames] = useState<GameSummary[]>([])

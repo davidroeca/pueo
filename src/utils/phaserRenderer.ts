@@ -8,7 +8,7 @@ import type {
   ActionDefinition,
   ActionEffect,
   BehaviorType,
-} from '@/types/gameSpec'
+} from '@/schemas/gameSpec'
 
 /**
  * Behavior state storage for patrol, follow, random behaviors
@@ -96,16 +96,18 @@ function createSceneClass(sceneSpec: SceneSpec, gameSpec: PhaserGameSpec) {
     }
 
     preload() {
-      // Load assets if any
-      for (const asset of gameSpec.assets) {
-        switch (asset.type) {
-          case 'sprite':
-          case 'image':
-            this.load.image(asset.key, asset.url)
-            break
-          case 'audio':
-            this.load.audio(asset.key, asset.url)
-            break
+      // Load assets if any are provided
+      if (gameSpec.assets && gameSpec.assets.length > 0) {
+        for (const asset of gameSpec.assets) {
+          switch (asset.type) {
+            case 'sprite':
+            case 'image':
+              this.load.image(asset.key, asset.url)
+              break
+            case 'audio':
+              this.load.audio(asset.key, asset.url)
+              break
+          }
         }
       }
     }

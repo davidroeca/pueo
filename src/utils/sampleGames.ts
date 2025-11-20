@@ -1,4 +1,4 @@
-import type { PhaserGameSpec } from '@/types/gameSpec'
+import type { PhaserGameSpec } from '@/schemas/gameSpec'
 
 export const samplePlatformer: PhaserGameSpec = {
   title: 'Simple Platformer',

@@ -7,7 +7,7 @@ import { GameBuilder } from '@/components/GameBuilder'
 import { GameLibrary } from '@/components/GameLibrary'
 import { GameRendererTest } from '@/components/GameRendererTest'
 import { Logo } from '@/components/Logo'
-import type { PhaserGameSpec } from '@/types/gameSpec'
+import { PhaserGameSpecSchema } from '@/schemas/gameSpec'
 
 type View = 'chat' | 'library' | 'test'
 
@@ -31,7 +31,6 @@ function App() {
 
   const { theme, toggleTheme } = useSettingsStore()
 
-  // Initialize theme on mount
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark')
@@ -40,7 +39,6 @@ function App() {
     }
   }, [theme])
 
-  // Check if AI is already initialized (from .env)
   useEffect(() => {
     checkInitialization()
   }, [checkInitialization])
@@ -56,7 +54,6 @@ function App() {
     let unlisten: UnlistenFn[] = []
 
     const setupListeners = async () => {
-      // Listen for streaming tokens
       const unlistenToken = await listen<string>('chat-token', (event) => {
         appendStreamingResponse(event.payload)
       })
@@ -83,18 +80,33 @@ function App() {
           if (toolCall.function.name === 'generate_phaser_game') {
             // Show "Generating Game..." indicator while tool executes
             setActiveToolCall({ name: toolCall.function.name, timestamp: Date.now() })
-
-            const gameSpec = toolCall.function.arguments as PhaserGameSpec
-            setGeneratedGameSpec(gameSpec)
           }
         }
       )
 
       // Listen for tool results (after tool execution completes)
-      const unlistenToolResult = await listen<string>('tool-result', () => {
+      // This contains the processed output with defaults applied
+      const unlistenToolResult = await listen<string>('tool-result', (event) => {
         // Tool execution completed, clear the indicator
-        // The result is the JSON string returned by the tool
         setActiveToolCall(null)
+
+        // Parse and validate the tool result using Zod
+        console.log(event.payload)
+        try {
+          // This is currently an issue
+          const parsed = JSON.parse(event.payload)
+          const validationResult = PhaserGameSpecSchema.safeParse(parsed)
+
+          if (validationResult.success) {
+            setGeneratedGameSpec(validationResult.data)
+          } else {
+            console.error('Game spec validation failed:', validationResult.error)
+            setError('Invalid game specification: ' + validationResult.error.issues[0]?.message)
+          }
+        } catch (err) {
+          console.error('Failed to parse tool result:', err)
+          setError('Failed to parse game specification')
+        }
       })
 
       // Listen for new turn (when agent responds again after tool use)

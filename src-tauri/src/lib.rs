@@ -2,8 +2,11 @@ use futures::StreamExt;
 use rig::agent::MultiTurnStreamItem;
 use rig::client::CompletionClient;
 use rig::completion::Message;
+use rig::message::ToolResultContent;
 use rig::providers::anthropic;
-use rig::streaming::{StreamedAssistantContent, StreamedUserContent, StreamingChat, StreamingPrompt};
+use rig::streaming::{
+    StreamedAssistantContent, StreamedUserContent, StreamingChat, StreamingPrompt,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::{Emitter, Manager, State, Window};
@@ -107,19 +110,20 @@ async fn stream_chat(
         agent.stream_prompt(&last_user_message).multi_turn(5).await
     } else {
         // Chat with history
-        agent.stream_chat(&last_user_message, history).multi_turn(5).await
+        agent
+            .stream_chat(&last_user_message, history)
+            .multi_turn(5)
+            .await
     };
 
     // Stream tokens to frontend and accumulate the full response
     let mut accumulated_response = String::new();
-    let mut has_received_text = false;
 
     while let Some(result) = stream.next().await {
         match result {
             Ok(chunk) => match chunk {
                 MultiTurnStreamItem::StreamAssistantItem(item) => match item {
                     StreamedAssistantContent::Text(text) => {
-                        has_received_text = true;
                         accumulated_response.push_str(&text.text);
                         window
                             .emit("chat-token", &text.text)
@@ -146,18 +150,27 @@ async fn stream_chat(
                     // This is emitted after a tool is executed (tool result)
                     match user_item {
                         StreamedUserContent::ToolResult(result) => {
-                            window
-                                .emit("tool-result", &result.content)
-                                .map_err(|e| format!("Failed to emit tool result: {}", e))?;
+                            if let Some(text_item_raw) = result
+                                .content
+                                .iter()
+                                .map(|item| match item {
+                                    ToolResultContent::Text(text) => Some(text),
+                                    _ => None,
+                                })
+                                .filter_map(|item| item)
+                                .next()
+                            {
+                                let text_item = serde_json::json!(text_item_raw.text);
+                                window
+                                    .emit("tool-result", text_item)
+                                    .map_err(|e| format!("Failed to emit tool result: {}", e))?;
 
-                            // After tool execution, emit new-turn to signal the frontend
-                            // to save the current streaming content and start a new message
-                            window
-                                .emit("chat-new-turn", ())
-                                .map_err(|e| format!("Failed to emit new-turn: {}", e))?;
-
-                            // Reset the text tracking for the new turn
-                            has_received_text = false;
+                                // After tool execution, emit new-turn to signal the frontend
+                                // to save the current streaming content and start a new message
+                                window
+                                    .emit("chat-new-turn", ())
+                                    .map_err(|e| format!("Failed to emit new-turn: {}", e))?;
+                            };
                         }
                     }
                 }

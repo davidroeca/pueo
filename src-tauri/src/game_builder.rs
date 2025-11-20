@@ -247,8 +247,6 @@ You: [Use the generate_phaser_game tool with a platformer specification, then ex
 pub enum GameBuilderError {
     #[error("Invalid game configuration: {0}")]
     InvalidConfiguration(String),
-    #[error("Serialization error: {0}")]
-    SerializationError(String),
 }
 
 /// Physics configuration for the game
@@ -678,7 +676,7 @@ impl Tool for PhaserGameTool {
 
     type Error = GameBuilderError;
     type Args = PhaserGameSpec;
-    type Output = String;
+    type Output = PhaserGameSpec;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         let schema = schemars::schema_for!(PhaserGameSpec);
@@ -710,9 +708,7 @@ impl Tool for PhaserGameTool {
             ));
         }
 
-        // Serialize the complete game spec as the response
-        serde_json::to_string_pretty(&args)
-            .map_err(|e| GameBuilderError::SerializationError(e.to_string()))
+        Ok(args)
     }
 }
 

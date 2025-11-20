@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
-import type { PhaserGameSpec } from '@/types/gameSpec'
+import type { PhaserGameSpec } from '@/schemas/gameSpec'
 
 export interface ChatMessage {
   id: string

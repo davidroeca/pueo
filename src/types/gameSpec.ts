@@ -4,7 +4,7 @@ export interface PhaserGameSpec {
   title: string
   description: string
   game: GameConfig
-  assets: Asset[]
+  assets?: Asset[]  // Optional - LLM may not always provide assets
   scenes: Scene[]
   controls_description: string[]
   key_concepts: string[]
